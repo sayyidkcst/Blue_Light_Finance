@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blue Light Finance Pro</title>
-    <!-- Modern Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <style>
         :root {
             --primary-dark: #0f172a;
@@ -24,23 +24,10 @@
             --btn-bg: #f1f5f9;
             --btn-hover: #e2e8f0;
         }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        /* Hide number input spinners */
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { 
-            -webkit-appearance: none; 
-            margin: 0; 
-        }
-        input[type=number] {
-            -moz-appearance: textfield;
-            appearance: textfield;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
         body {
             font-family: 'Inter', sans-serif;
@@ -53,888 +40,563 @@
             color: var(--text-main);
         }
 
-        /* Main App Window */
+        /* ============ AUTH SCREEN ============ */
+        .auth-screen {
+            position: fixed; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #0b1120 0%, #1e293b 100%);
+            z-index: 5000;
+            padding: 20px;
+        }
+        .auth-card {
+            background: #fff;
+            width: 100%; max-width: 420px;
+            border-radius: 14px;
+            padding: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        }
+        .auth-card h1 {
+            font-size: 22px; color: var(--primary-dark);
+            text-align: center; margin-bottom: 6px;
+        }
+        .auth-card .subtitle {
+            text-align: center; color: var(--text-muted);
+            font-size: 13px; margin-bottom: 24px;
+        }
+        .auth-tabs {
+            display: flex; background: #f1f5f9;
+            border-radius: 8px; padding: 4px; margin-bottom: 20px;
+        }
+        .auth-tab {
+            flex: 1; padding: 9px; border: none; cursor: pointer;
+            background: transparent; border-radius: 6px;
+            font-family: inherit; font-weight: 600; font-size: 14px;
+            color: var(--text-muted); transition: all .2s;
+        }
+        .auth-tab.active {
+            background: #fff; color: var(--primary-dark);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .auth-form { display: flex; flex-direction: column; gap: 14px; }
+        .auth-form .field { display: flex; flex-direction: column; gap: 6px; }
+        .auth-form label {
+            font-size: 13px; font-weight: 500; color: var(--text-muted);
+        }
+        .auth-form input {
+            padding: 11px 13px; border: 1px solid var(--border-color);
+            border-radius: 8px; font-size: 15px;
+            font-family: inherit; outline: none; transition: border-color .2s;
+        }
+        .auth-form input:focus {
+            border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+        }
+        .auth-submit {
+            margin-top: 6px; padding: 12px;
+            background: var(--primary-dark); color: #fff;
+            border: none; border-radius: 8px;
+            font-family: inherit; font-size: 15px; font-weight: 600;
+            cursor: pointer; transition: background .2s;
+        }
+        .auth-submit:hover { background: #1e293b; }
+        .auth-submit:disabled { opacity: .6; cursor: not-allowed; }
+        .auth-msg {
+            font-size: 13px; text-align: center; min-height: 18px;
+            color: var(--accent-red);
+        }
+        .auth-msg.success { color: var(--accent-green); }
+
+        /* ============ MAIN APP ============ */
         .app-container {
             width: 1300px;
             background-color: var(--bg-panel);
             border-radius: 12px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            display: flex; flex-direction: column; overflow: hidden;
         }
-
-        /* Menu Bar */
         .menu-bar {
-            display: flex;
-            padding: 10px 20px;
+            display: flex; padding: 10px 20px;
             background-color: #f8fafc;
             border-bottom: 1px solid var(--border-color);
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-muted);
-            gap: 5px; 
-            position: relative;
-            z-index: 100;
+            font-size: 13px; font-weight: 500; color: var(--text-muted);
+            gap: 5px; position: relative; z-index: 100;
         }
-
         .menu-item {
-            position: relative;
-            cursor: pointer;
-            padding: 6px 12px;
-            border-radius: 4px;
-            transition: all 0.2s ease;
-            user-select: none;
+            position: relative; cursor: pointer; padding: 6px 12px;
+            border-radius: 4px; transition: all 0.2s ease; user-select: none;
         }
-        .menu-item:hover {
-            background-color: #e2e8f0;
-            color: var(--primary-dark);
-        }
-
-        /* Dropdown Sub-menu — stays open on mouse move */
+        .menu-item:hover { background-color: #e2e8f0; color: var(--primary-dark); }
         .sub-menu {
-            display: none;
-            position: absolute;
-            top: 100%;
-            left: 0;
-            background-color: #ffffff;
-            border: 1px solid var(--border-color);
+            display: none; position: absolute; top: 100%; left: 0;
+            background-color: #ffffff; border: 1px solid var(--border-color);
             border-radius: 6px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            min-width: 180px;
-            padding: 6px 0;
-            z-index: 200;
-            margin-top: 4px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+            min-width: 180px; padding: 6px 0; z-index: 200; margin-top: 4px;
             pointer-events: auto;
         }
-        .menu-item:hover .sub-menu {
-            display: block;
-        }
-        /* Bridge gap so submenu doesn't close when moving cursor down */
+        .menu-item:hover .sub-menu { display: block; }
         .menu-item::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            left: 0;
-            width: 100%;
-            height: 8px;
-            background: transparent;
-            pointer-events: auto;
-            display: none;
+            content: ''; position: absolute; top: 100%; left: 0;
+            width: 100%; height: 8px; background: transparent;
+            pointer-events: auto; display: none;
         }
-        .menu-item:hover::after {
-            display: block;
-        }
+        .menu-item:hover::after { display: block; }
         .sub-menu-item {
-            padding: 8px 16px;
-            color: var(--text-main);
-            font-size: 13px;
-            transition: background-color 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
+            padding: 8px 16px; color: var(--text-main); font-size: 13px;
+            transition: background-color 0.2s; display: flex;
+            align-items: center; gap: 8px; cursor: pointer;
         }
-        .sub-menu-item:hover {
-            background-color: #f1f5f9;
-            color: var(--primary-dark);
-        }
-        .sub-menu-item svg {
-            opacity: 0.6;
-        }
+        .sub-menu-item:hover { background-color: #f1f5f9; color: var(--primary-dark); }
+        .sub-menu-item svg { opacity: 0.6; }
 
-        /* Header */
         .header {
             background: linear-gradient(135deg, var(--header-bg) 0%, #1e293b 100%);
-            color: #ffffff;
-            display: flex;
-            justify-content: space-between;
-            padding: 20px 30px;
-            align-items: center;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            position: relative;
-            z-index: 10;
+            color: #ffffff; display: flex; justify-content: space-between;
+            padding: 20px 30px; align-items: center;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            position: relative; z-index: 10;
         }
-
-        .header-left {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
+        .header-left { display: flex; flex-direction: column; gap: 6px; }
         .date-input {
-            background-color: transparent;
-            border: 1px solid #475569;
-            border-radius: 6px;
-            color: var(--accent-yellow);
-            font-family: 'Inter', sans-serif;
-            font-size: 24px;
-            font-weight: 700;
-            padding: 4px 8px;
-            cursor: pointer;
-            outline: none;
-            transition: all 0.2s;
-            width: 200px;
+            background-color: transparent; border: 1px solid #475569;
+            border-radius: 6px; color: var(--accent-yellow);
+            font-family: inherit; font-size: 24px; font-weight: 700;
+            padding: 4px 8px; cursor: pointer; outline: none;
+            transition: all 0.2s; width: 200px;
         }
         .date-input:hover, .date-input:focus {
             border-color: var(--accent-yellow);
-            box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.2);
+            box-shadow: 0 0 0 2px rgba(250,204,21,0.2);
         }
-        .date-input::-webkit-calendar-picker-indicator {
-            filter: invert(1);
-            cursor: pointer;
-            opacity: 0.8;
-        }
-        .date-input::-webkit-calendar-picker-indicator:hover {
-            opacity: 1;
-        }
-
-        .day-text {
-            font-size: 18px;
-            font-weight: 400;
-            color: #cbd5e1;
-            padding-left: 8px;
-        }
-
-        .header-center {
-            text-align: center;
-            font-size: 14px;
-            line-height: 1.6;
-            color: #94a3b8;
-        }
-        .header-center .text-red {
-            color: var(--accent-red);
-            font-weight: 600;
-        }
-
-        .header-right {
-            text-align: right;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .user-name {
-            font-size: 20px;
-            font-weight: 600;
-            color: #f8fafc;
-            letter-spacing: 1px;
-        }
+        .date-input::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; opacity: .8; }
+        .day-text { font-size: 18px; font-weight: 400; color: #cbd5e1; padding-left: 8px; }
+        .header-center { text-align: center; font-size: 14px; line-height: 1.6; color: #94a3b8; }
+        .header-center .text-red { color: var(--accent-red); font-weight: 600; }
+        .header-right { text-align: right; display: flex; flex-direction: column; gap: 4px; }
+        .user-name { font-size: 20px; font-weight: 600; color: #f8fafc; letter-spacing: 1px; }
         .time-yellow {
-            color: var(--accent-yellow);
-            font-size: 32px;
-            font-weight: 700;
+            color: var(--accent-yellow); font-size: 32px; font-weight: 700;
             font-variant-numeric: tabular-nums;
-            text-shadow: 0 0 15px rgba(250, 204, 21, 0.3);
+            text-shadow: 0 0 15px rgba(250,204,21,0.3);
         }
+        .conn-status {
+            font-size: 11px; margin-top: 2px; color: #94a3b8;
+        }
+        .conn-status.online { color: var(--accent-green); }
+        .conn-status.offline { color: var(--accent-red); }
 
-        /* Main Grid Layout */
         .main-content {
-            display: grid;
-            grid-template-columns: 1fr 1.3fr 1fr;
-            gap: 20px;
-            padding: 25px;
-            background-color: #f8fafc;
-            flex-grow: 1;
+            display: grid; grid-template-columns: 1fr 1.3fr 1fr;
+            gap: 20px; padding: 25px;
+            background-color: #f8fafc; flex-grow: 1;
         }
-
-        /* General Panel Styling */
         .panel {
             background-color: var(--bg-panel);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
+            display: flex; flex-direction: column; overflow: hidden;
         }
-
-        /* Columns */
         .col-left, .col-mid, .col-right {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
+            display: flex; flex-direction: column; gap: 20px;
         }
-
-        /* --- LEFT COLUMN --- */
         .input-main {
-            width: 100%;
-            padding: 12px 16px;
+            width: 100%; padding: 12px 16px;
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            font-size: 16px;
-            font-family: 'Inter', sans-serif;
+            border-radius: 8px; font-size: 16px; font-family: inherit;
             background-color: var(--bg-panel);
-            transition: border-color 0.2s, box-shadow 0.2s;
-            outline: none;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            transition: border-color .2s, box-shadow .2s; outline: none;
+            box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
         }
-        .input-main:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-        }
-
+        .input-main:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
         .panel-header {
-            padding: 12px 16px;
-            font-size: 15px;
-            font-weight: 600;
+            padding: 12px 16px; font-size: 15px; font-weight: 600;
             border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: #f8fafc;
-            color: var(--text-main);
+            display: flex; justify-content: space-between; align-items: center;
+            background-color: #f8fafc; color: var(--text-main);
         }
-
-        /* Clickable Header Buttons */
         .header-action-btn {
-            background: none;
-            border: none;
-            font-family: 'Inter', sans-serif;
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--text-main);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: color 0.2s;
-            width: 100%;
-            justify-content: flex-start;
+            background: none; border: none; font-family: inherit;
+            font-size: 15px; font-weight: 600; color: var(--text-main);
+            cursor: pointer; display: flex; align-items: center; gap: 8px;
+            transition: color .2s; width: 100%; justify-content: flex-start;
         }
-        .header-action-btn:hover {
-            color: #3b82f6;
-        }
-        .header-action-btn svg {
-            opacity: 0.5;
-            transition: opacity 0.2s;
-        }
-        .header-action-btn:hover svg {
-            opacity: 1;
-        }
+        .header-action-btn:hover { color: #3b82f6; }
+        .header-action-btn svg { opacity: .5; transition: opacity .2s; }
+        .header-action-btn:hover svg { opacity: 1; }
 
-        /* Table Styling */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-        }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
         th, td {
             border-bottom: 1px solid var(--border-color);
-            padding: 8px 16px;
-            text-align: left;
+            padding: 8px 16px; text-align: left;
         }
         th {
-            background-color: #f1f5f9;
-            font-weight: 500;
-            color: var(--text-muted);
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            background-color: #f1f5f9; font-weight: 500;
+            color: var(--text-muted); font-size: 13px;
+            text-transform: uppercase; letter-spacing: .5px;
         }
-        
-        .table-scroll {
-            height: 150px;
-            overflow-y: auto;
-        }
-
-        /* Delete Button Styling */
+        .table-scroll { height: 150px; overflow-y: auto; }
         .btn-delete-row {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 4px;
-            border-radius: 4px;
-            transition: all 0.2s;
+            background: none; border: none; color: var(--text-muted);
+            cursor: pointer; display: flex; align-items: center;
+            justify-content: center; padding: 4px; border-radius: 4px;
+            transition: all .2s;
         }
-        .btn-delete-row:hover {
-            background-color: #fee2e2;
-            color: var(--accent-red);
-        }
-
-        /* Empty State */
+        .btn-delete-row:hover { background-color: #fee2e2; color: var(--accent-red); }
         .empty-row td {
-            text-align: center;
-            color: var(--text-muted);
-            font-style: italic;
-            padding: 20px;
+            text-align: center; color: var(--text-muted);
+            font-style: italic; padding: 20px;
         }
-
-        /* Smart Pay Specifics */
         .smart-pay-header {
-            text-align: center;
-            font-size: 15px;
-            font-weight: 600;
-            padding: 12px;
-            border-bottom: 1px solid var(--border-color);
+            text-align: center; font-size: 15px; font-weight: 600;
+            padding: 12px; border-bottom: 1px solid var(--border-color);
             background-color: #f8fafc;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            display: flex; justify-content: center; align-items: center;
         }
         .smart-pay-footer {
-            text-align: center;
-            font-size: 16px;
-            font-weight: 700;
-            padding: 12px;
-            background-color: #f8fafc;
+            text-align: center; font-size: 16px; font-weight: 700;
+            padding: 12px; background-color: #f8fafc;
             color: var(--primary-dark);
         }
-
-        /* SmartPay Flexbox Heights */
-        .smart-pay-panel {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-        }
+        .smart-pay-panel { flex-grow: 1; display: flex; flex-direction: column; }
         .smart-pay-body {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            min-height: 150px;
+            flex-grow: 1; display: flex; flex-direction: column; min-height: 150px;
         }
-        .smart-pay-body .table-scroll {
-            flex-grow: 1;
-            height: auto;
-        }
+        .smart-pay-body .table-scroll { flex-grow: 1; height: auto; }
 
-        /* --- MIDDLE COLUMN --- */
         .form-container {
-            padding: 20px;
-            background-color: var(--bg-panel);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            padding: 20px; background-color: var(--bg-panel);
+            border: 1px solid var(--border-color); border-radius: 8px;
+            box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1);
         }
-
         .form-group {
-            display: flex;
-            justify-content: flex-start;
-            align-items: center;
-            margin-bottom: 15px;
-            gap: 12px;
+            display: flex; justify-content: flex-start; align-items: center;
+            margin-bottom: 15px; gap: 12px;
         }
         .form-group:last-child { margin-bottom: 0; }
-        
         .form-group label {
-            font-size: 16px;
-            font-weight: 500;
-            color: var(--text-main);
-            width: 130px;
-            text-align: left;
+            font-size: 16px; font-weight: 500; color: var(--text-main);
+            width: 130px; text-align: left;
         }
-        
         .form-group input {
-            width: 180px;
-            padding: 10px 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            font-size: 16px;
-            font-family: 'Inter', sans-serif;
-            text-align: left;
-            background-color: #f8fafc;
-            color: var(--primary-dark);
-            font-weight: 500;
-            transition: all 0.2s;
+            width: 180px; padding: 10px 12px;
+            border: 1px solid var(--border-color); border-radius: 6px;
+            font-size: 16px; font-family: inherit; text-align: left;
+            background-color: #f8fafc; color: var(--primary-dark);
+            font-weight: 500; transition: all .2s;
         }
         .form-group input:focus {
-            background-color: #fff;
-            border-color: #3b82f6;
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+            background-color: #fff; border-color: #3b82f6;
+            outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
         }
-        
         .btn-icon {
-            width: 36px;
-            height: 38px;
-            border: 1px solid var(--border-color);
-            background-color: var(--bg-panel);
-            border-radius: 6px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-muted);
-            transition: all 0.2s;
+            width: 36px; height: 38px; border: 1px solid var(--border-color);
+            background-color: var(--bg-panel); border-radius: 6px;
+            cursor: pointer; display: flex; align-items: center;
+            justify-content: center; color: var(--text-muted);
+            transition: all .2s;
         }
-        .btn-icon:hover {
-            background-color: var(--btn-hover);
-            color: var(--primary-dark);
-        }
+        .btn-icon:hover { background-color: var(--btn-hover); color: var(--primary-dark); }
 
-        /* --- RIGHT COLUMN --- */
         .shift-cash-panel {
             background-color: var(--bg-panel);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            overflow: hidden;
+            border-radius: 8px; overflow: hidden;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         .shift-cash-header {
-            background-color: var(--header-bg);
-            color: #ffffff;
-            text-align: center;
-            padding: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
+            background-color: var(--header-bg); color: #fff;
+            text-align: center; padding: 12px;
+            font-size: 16px; font-weight: 600; letter-spacing: .5px;
         }
         .shift-cash-body {
-            text-align: center;
-            padding: 24px 0;
-            background-color: #f8fafc;
+            text-align: center; padding: 24px 0; background-color: #f8fafc;
         }
         .shift-cash-amount {
-            color: var(--accent-red);
-            font-size: 38px;
-            font-weight: 800;
-            letter-spacing: 1px;
-            font-variant-numeric: tabular-nums;
+            color: var(--accent-red); font-size: 38px; font-weight: 800;
+            letter-spacing: 1px; font-variant-numeric: tabular-nums;
         }
-        .shift-cash-amount.tally {
-            color: var(--accent-green);
-        }
+        .shift-cash-amount.tally { color: var(--accent-green); }
 
-        .denom-panel {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-        }
+        .denom-panel { flex-grow: 1; display: flex; flex-direction: column; }
         .denom-header {
-            text-align: center;
-            font-size: 32px;
-            font-weight: 700;
-            padding: 16px;
-            border-bottom: 1px solid var(--border-color);
-            color: var(--primary-dark);
-            font-variant-numeric: tabular-nums;
+            text-align: center; font-size: 32px; font-weight: 700;
+            padding: 16px; border-bottom: 1px solid var(--border-color);
+            color: var(--primary-dark); font-variant-numeric: tabular-nums;
         }
-        
-        /* Currency Count Table Styling */
-        .denom-table {
-            width: 100%;
-            border-collapse: collapse;
-            flex-grow: 1;
-        }
+        .denom-table { width: 100%; border-collapse: collapse; flex-grow: 1; }
         .denom-table th {
-            background-color: #f1f5f9;
-            font-weight: 600;
-            color: var(--text-muted);
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 6px 8px;
-            text-align: left;
+            background-color: #f1f5f9; font-weight: 600;
+            color: var(--text-muted); font-size: 12px;
+            text-transform: uppercase; letter-spacing: .5px;
+            padding: 6px 8px; text-align: left;
             border-bottom: 1px solid var(--border-color);
         }
         .denom-table td {
             border-bottom: 1px solid var(--border-color);
-            padding: 4px 8px;
-            font-size: 14px;
+            padding: 4px 8px; font-size: 14px;
             font-variant-numeric: tabular-nums;
         }
         .denom-table tr:last-child td { border-bottom: none; }
-        
-        /* Column specific styling */
-        .denom-table td:nth-child(1) { 
-            font-weight: 600; 
-            color: var(--text-muted);
-            background-color: #f8fafc;
-            width: 30%;
-            text-align: left;
+        .denom-table td:nth-child(1) {
+            font-weight: 600; color: var(--text-muted);
+            background-color: #f8fafc; width: 30%; text-align: left;
         }
-        .denom-table td:nth-child(2) { 
-            width: 40%;
-            text-align: center;
+        .denom-table td:nth-child(2) { width: 40%; text-align: center; }
+        .denom-table td:nth-child(3) {
+            width: 30%; text-align: right; font-weight: 500;
+            color: var(--primary-dark); padding-right: 12px;
         }
-        .denom-table td:nth-child(3) { 
-            width: 30%;
-            text-align: right;
-            font-weight: 500;
-            color: var(--primary-dark);
-            padding-right: 12px;
-        }
-        
-        /* Currency Count Input Boxes */
         .denom-input {
-            width: 100%;
-            max-width: 80px;
-            padding: 4px 6px;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            font-size: 14px;
-            font-family: 'Inter', sans-serif;
-            text-align: right;
-            background-color: #f8fafc;
-            color: var(--primary-dark);
-            font-weight: 500;
-            transition: all 0.2s;
-            margin: 0 auto;
-            display: block;
+            width: 100%; max-width: 80px; padding: 4px 6px;
+            border: 1px solid var(--border-color); border-radius: 4px;
+            font-size: 14px; font-family: inherit; text-align: right;
+            background-color: #f8fafc; color: var(--primary-dark);
+            font-weight: 500; transition: all .2s;
+            margin: 0 auto; display: block;
         }
         .denom-input:focus {
-            background-color: #fff;
-            border-color: #3b82f6;
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+            background-color: #fff; border-color: #3b82f6;
+            outline: none; box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
         }
-
         .action-buttons {
-            display: flex;
-            padding: 16px;
-            gap: 12px;
-            background-color: #f8fafc;
-            border-top: 1px solid var(--border-color);
+            display: flex; padding: 16px; gap: 12px;
+            background-color: #f8fafc; border-top: 1px solid var(--border-color);
         }
         .action-btn {
-            flex-grow: 1;
-            padding: 10px 8px;
+            flex-grow: 1; padding: 10px 8px;
             background-color: var(--bg-panel);
             border: 1px solid var(--border-color);
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--text-main);
-            transition: all 0.2s;
-            font-family: 'Inter', sans-serif;
+            border-radius: 6px; cursor: pointer;
+            font-size: 14px; font-weight: 500; color: var(--text-main);
+            transition: all .2s; font-family: inherit;
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
-        .action-btn:hover { 
+        .action-btn:hover {
             background-color: var(--btn-hover);
             transform: translateY(-1px);
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
         }
-        .action-btn:active {
-            transform: translateY(0);
+        .action-btn:active { transform: translateY(0); }
+        .save-changes-btn {
+            background-color: var(--primary-dark) !important;
+            color: white !important;
+            border-color: var(--primary-dark) !important;
         }
 
-        /* --- MODAL STYLING --- */
         .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(15, 23, 42, 0.6);
+            position: fixed; inset: 0;
+            background-color: rgba(15,23,42,0.6);
             backdrop-filter: blur(4px);
-            display: none; 
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.2s ease;
+            display: none; justify-content: center; align-items: center;
+            z-index: 1000; opacity: 0; transition: opacity .2s ease;
         }
-        .modal-overlay.active {
-            display: flex;
-            opacity: 1;
-        }
+        .modal-overlay.active { display: flex; opacity: 1; }
         .modal-content {
-            background-color: #ffffff;
-            border-radius: 12px;
-            width: 450px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            transform: translateY(20px);
-            transition: transform 0.2s ease;
+            background-color: #fff; border-radius: 12px;
+            width: 450px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            transform: translateY(20px); transition: transform .2s ease;
             overflow: hidden;
         }
-        .modal-overlay.active .modal-content {
-            transform: translateY(0);
-        }
+        .modal-overlay.active .modal-content { transform: translateY(0); }
         .modal-header {
-            background-color: var(--header-bg);
-            color: white;
-            padding: 16px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            background-color: var(--header-bg); color: #fff;
+            padding: 16px 20px; display: flex;
+            justify-content: space-between; align-items: center;
         }
-        .modal-header h3 {
-            font-size: 18px;
-            font-weight: 600;
-        }
+        .modal-header h3 { font-size: 18px; font-weight: 600; }
         .modal-close {
-            background: none;
-            border: none;
-            color: #94a3b8;
-            cursor: pointer;
-            font-size: 20px;
-            line-height: 1;
-            padding: 4px;
-            transition: color 0.2s;
+            background: none; border: none; color: #94a3b8;
+            cursor: pointer; font-size: 20px; line-height: 1;
+            padding: 4px; transition: color .2s;
         }
-        .modal-close:hover {
-            color: white;
-        }
+        .modal-close:hover { color: #fff; }
         .modal-body {
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            max-height: 400px;
-            overflow-y: auto;
+            padding: 20px; display: flex; flex-direction: column;
+            gap: 15px; max-height: 400px; overflow-y: auto;
         }
-        .modal-form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
+        .modal-form-group { display: flex; flex-direction: column; gap: 6px; }
         .modal-form-group label {
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--text-muted);
+            font-size: 14px; font-weight: 500; color: var(--text-muted);
         }
         .modal-form-group input, .modal-form-group select {
             padding: 10px 12px;
             border: 1px solid var(--border-color);
-            border-radius: 6px;
-            font-size: 15px;
-            font-family: 'Inter', sans-serif;
-            outline: none;
-            transition: border-color 0.2s;
-            background-color: #ffffff;
+            border-radius: 6px; font-size: 15px;
+            font-family: inherit; outline: none;
+            transition: border-color .2s; background-color: #fff;
         }
         .modal-form-group input:focus, .modal-form-group select:focus {
             border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
         }
         .modal-footer {
-            padding: 16px 20px;
-            background-color: #f8fafc;
+            padding: 16px 20px; background-color: #f8fafc;
             border-top: 1px solid var(--border-color);
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
+            display: flex; justify-content: flex-end; gap: 10px;
         }
         .modal-btn {
-            padding: 10px 16px;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
+            padding: 10px 16px; border-radius: 6px;
+            font-size: 14px; font-weight: 500; cursor: pointer;
             border: 1px solid transparent;
-            transition: all 0.2s;
-            font-family: 'Inter', sans-serif;
+            transition: all .2s; font-family: inherit;
         }
         .modal-btn-cancel {
             background-color: #fff;
             border-color: var(--border-color);
             color: var(--text-main);
         }
-        .modal-btn-cancel:hover {
-            background-color: #f1f5f9;
-        }
+        .modal-btn-cancel:hover { background-color: #f1f5f9; }
         .modal-btn-submit {
-            background-color: var(--primary-dark);
-            color: white;
+            background-color: var(--primary-dark); color: #fff;
         }
-        .modal-btn-submit:hover {
-            background-color: #1e293b;
-            transform: translateY(-1px);
-        }
+        .modal-btn-submit:hover { background-color: #1e293b; transform: translateY(-1px); }
 
-        /* Ledger Table Styling */
         .ledger-table-container {
-            margin-top: 10px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            overflow: hidden;
-            max-height: 200px;
-            overflow-y: auto;
+            margin-top: 10px; border: 1px solid var(--border-color);
+            border-radius: 6px; overflow: hidden;
+            max-height: 200px; overflow-y: auto;
         }
-        .ledger-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+        .ledger-table { width: 100%; border-collapse: collapse; }
         .ledger-table th {
-            background-color: #f1f5f9;
-            font-size: 12px;
-            padding: 8px 12px;
-            text-align: left;
+            background-color: #f1f5f9; font-size: 12px;
+            padding: 8px 12px; text-align: left;
         }
         .ledger-table td {
-            padding: 8px 12px;
-            font-size: 14px;
+            padding: 8px 12px; font-size: 14px;
             border-bottom: 1px solid var(--border-color);
         }
-        .ledger-table tr:last-child td {
-            border-bottom: none;
-        }
-        .ledger-table .no-col {
-            width: 40px;
-            color: var(--text-muted);
-            font-weight: 600;
-        }
-        .ledger-table .action-col {
-            width: 40px;
-            text-align: center;
-        }
+        .ledger-table tr:last-child td { border-bottom: none; }
+        .ledger-table .no-col { width: 40px; color: var(--text-muted); font-weight: 600; }
+        .ledger-table .action-col { width: 40px; text-align: center; }
 
-        /* Ledger History Modal Styling */
         .history-table-container {
-            margin-top: 10px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            overflow: hidden;
-            max-height: 300px;
-            overflow-y: auto;
+            margin-top: 10px; border: 1px solid var(--border-color);
+            border-radius: 6px; overflow: hidden;
+            max-height: 300px; overflow-y: auto;
         }
-        .history-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+        .history-table { width: 100%; border-collapse: collapse; }
         .history-table th {
-            background-color: #f1f5f9;
-            font-size: 12px;
-            padding: 8px 12px;
-            text-align: left;
-            position: sticky;
-            top: 0;
-            z-index: 1;
+            background-color: #f1f5f9; font-size: 12px;
+            padding: 8px 12px; text-align: left;
+            position: sticky; top: 0; z-index: 1;
         }
         .history-table td {
-            padding: 8px 12px;
-            font-size: 14px;
+            padding: 8px 12px; font-size: 14px;
             border-bottom: 1px solid var(--border-color);
         }
-        .history-table tr:last-child td {
-            border-bottom: none;
-        }
-        .history-table .debit {
-            color: var(--accent-red);
-            font-weight: 500;
-        }
-        .history-table .credit {
-            color: var(--accent-green);
-            font-weight: 500;
-        }
-        .history-table .balance-col {
-            font-weight: 600;
-            color: var(--primary-dark);
-        }
-        .history-table .action-col {
-            width: 40px;
-            text-align: center;
-        }
+        .history-table tr:last-child td { border-bottom: none; }
+        .history-table .debit { color: var(--accent-red); font-weight: 500; }
+        .history-table .credit { color: var(--accent-green); font-weight: 500; }
+        .history-table .balance-col { font-weight: 600; color: var(--primary-dark); }
+        .history-table .action-col { width: 40px; text-align: center; }
 
-        /* --- FLOATING CALCULATOR --- */
         .calculator-window {
-            display: none;
-            position: fixed;
-            top: 100px;
-            left: 100px;
-            width: 300px;
-            background-color: #1e293b;
+            display: none; position: fixed; top: 100px; left: 100px;
+            width: 300px; background-color: #1e293b;
             border-radius: 12px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            z-index: 2000;
-            overflow: hidden;
-            border: 1px solid #334155;
-            user-select: none;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            z-index: 2000; overflow: hidden;
+            border: 1px solid #334155; user-select: none;
         }
-        .calculator-window.active {
-            display: block;
-        }
+        .calculator-window.active { display: block; }
         .calc-titlebar {
-            background-color: var(--header-bg);
-            color: #e2e8f0;
-            padding: 8px 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: move;
-            font-size: 13px;
-            font-weight: 600;
+            background-color: var(--header-bg); color: #e2e8f0;
+            padding: 8px 12px; display: flex;
+            justify-content: space-between; align-items: center;
+            cursor: move; font-size: 13px; font-weight: 600;
         }
-        .calc-titlebar-buttons {
-            display: flex;
-            gap: 6px;
-        }
+        .calc-titlebar-buttons { display: flex; gap: 6px; }
         .calc-titlebar-btn {
-            background: none;
-            border: none;
-            color: #94a3b8;
-            cursor: pointer;
-            font-size: 16px;
-            line-height: 1;
-            padding: 0 4px;
-            transition: color 0.2s;
+            background: none; border: none; color: #94a3b8;
+            cursor: pointer; font-size: 16px; line-height: 1;
+            padding: 0 4px; transition: color .2s;
         }
-        .calc-titlebar-btn:hover {
-            color: #ef4444;
-        }
+        .calc-titlebar-btn:hover { color: #ef4444; }
         .calc-display {
-            padding: 16px;
-            text-align: right;
-            background-color: #0f172a;
-            color: #facc15;
-            font-size: 28px;
-            font-weight: 700;
+            padding: 16px; text-align: right;
+            background-color: #0f172a; color: #facc15;
+            font-size: 28px; font-weight: 700;
             font-variant-numeric: tabular-nums;
-            min-height: 60px;
-            overflow: hidden;
+            min-height: 60px; overflow: hidden;
             word-break: break-all;
             border-bottom: 1px solid #334155;
         }
         .calc-buttons {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1px;
-            background-color: #334155;
-            padding: 1px;
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 1px; background-color: #334155; padding: 1px;
         }
         .calc-btn {
-            background-color: #1e293b;
-            border: none;
-            color: #e2e8f0;
-            font-size: 18px;
-            font-weight: 500;
-            padding: 16px 0;
-            cursor: pointer;
-            transition: background-color 0.15s;
-            font-family: 'Inter', sans-serif;
+            background-color: #1e293b; border: none; color: #e2e8f0;
+            font-size: 18px; font-weight: 500; padding: 16px 0;
+            cursor: pointer; transition: background-color .15s;
+            font-family: inherit;
         }
-        .calc-btn:hover {
-            background-color: #334155;
-        }
-        .calc-btn:active {
-            background-color: #475569;
-        }
-        .calc-btn.operator {
-            color: #facc15;
-        }
+        .calc-btn:hover { background-color: #334155; }
+        .calc-btn:active { background-color: #475569; }
+        .calc-btn.operator { color: #facc15; }
         .calc-btn.equals {
-            background-color: #facc15;
-            color: #0f172a;
-            font-weight: 700;
+            background-color: #facc15; color: #0f172a; font-weight: 700;
         }
-        .calc-btn.equals:hover {
-            background-color: #eab308;
-        }
-        .calc-btn.clear {
-            color: #ef4444;
-        }
-        .calc-btn.span-two {
-            grid-column: span 2;
-        }
+        .calc-btn.equals:hover { background-color: #eab308; }
+        .calc-btn.clear { color: #ef4444; }
+        .calc-btn.span-two { grid-column: span 2; }
 
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-<div class="app-container">
-    <!-- Menu Bar -->
+<!-- ============ AUTH SCREEN ============ -->
+<div class="auth-screen" id="authScreen">
+    <div class="auth-card">
+        <h1>Blue Light Finance Pro</h1>
+        <div class="subtitle">Sign in or create your account</div>
+
+        <div class="auth-tabs">
+            <button class="auth-tab active" id="tabLogin">Log In</button>
+            <button class="auth-tab" id="tabSignup">Sign Up</button>
+        </div>
+
+        <form class="auth-form" id="loginForm">
+            <div class="field">
+                <label for="loginEmail">Email</label>
+                <input type="email" id="loginEmail" required autocomplete="email">
+            </div>
+            <div class="field">
+                <label for="loginPassword">Password</label>
+                <input type="password" id="loginPassword" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="auth-submit" id="loginBtn">Log In</button>
+            <div class="auth-msg" id="loginMsg"></div>
+        </form>
+
+        <form class="auth-form hidden" id="signupForm">
+            <div class="field">
+                <label for="signupName">Username</label>
+                <input type="text" id="signupName" required autocomplete="name">
+            </div>
+            <div class="field">
+                <label for="signupEmail">Email</label>
+                <input type="email" id="signupEmail" required autocomplete="email">
+            </div>
+            <div class="field">
+                <label for="signupPassword">Password (min 6 chars)</label>
+                <input type="password" id="signupPassword" required minlength="6" autocomplete="new-password">
+            </div>
+            <button type="submit" class="auth-submit" id="signupBtn">Create Account</button>
+            <div class="auth-msg" id="signupMsg"></div>
+        </form>
+    </div>
+</div>
+
+<!-- ============ MAIN APP ============ -->
+<div class="app-container hidden" id="appContainer">
     <div class="menu-bar">
-        <!-- File Menu with Sub-menu -->
         <div class="menu-item">
             File
             <div class="sub-menu">
@@ -946,7 +608,7 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                     Ledger History
                 </div>
-                <div class="sub-menu-item">
+                <div class="sub-menu-item" id="logoutBtn">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                     Log Out
                 </div>
@@ -959,10 +621,8 @@
         <div class="menu-item">Help</div>
     </div>
 
-    <!-- Header -->
     <div class="header">
         <div class="header-left">
-            <!-- Changeable Date Input -->
             <input type="date" class="date-input" id="datePicker">
             <div class="day-text" id="dayDisplay">Loading...</div>
         </div>
@@ -970,21 +630,17 @@
             <div class="text-red">Total Expenses : <span id="headerTotalExpenses">0.00</span></div>
         </div>
         <div class="header-right">
-            <div class="user-name">BABU MON</div>
+            <div class="user-name" id="currentUser">USER</div>
             <div class="time-yellow" id="liveClock">--:--:-- --</div>
+            <div class="conn-status" id="connStatus">● Connecting…</div>
         </div>
     </div>
 
-    <!-- Main Content -->
     <div class="main-content">
-        
-        <!-- Left Column -->
         <div class="col-left">
             <input type="text" class="input-main" id="searchInput" placeholder="Search expenses...">
-            
             <div class="panel" style="flex-grow: 1;">
                 <div class="panel-header">
-                    <!-- Clickable Total Expense -->
                     <button class="header-action-btn" id="openExpenseModal">
                         <span>Total Expence : <span id="leftTotalExpenseDisplay">0.00</span></span>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -994,21 +650,16 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Caption</th>
-                                <th>Ledger</th>
-                                <th>Amount</th>
+                                <th>Caption</th><th>Ledger</th><th>Amount</th>
                                 <th>type</th>
                                 <th style="width: 40px; text-align: center;">Action</th>
                             </tr>
                         </thead>
-                        <tbody id="expenseTableBody">
-                            <!-- Dynamically populated by JS -->
-                        </tbody>
+                        <tbody id="expenseTableBody"></tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- SmartPay Expenses Panel (Equal Height) -->
             <div class="panel smart-pay-panel">
                 <div class="smart-pay-header">
                     <button class="header-action-btn" id="openBankExpenseModal">
@@ -1021,22 +672,17 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Caption</th>
-                                    <th>Ledger</th>
-                                    <th>Amount</th>
+                                    <th>Caption</th><th>Ledger</th><th>Amount</th>
                                     <th style="width: 40px; text-align: center;">Action</th>
                                 </tr>
                             </thead>
-                            <tbody id="bankExpenseTableBody">
-                                <!-- Dynamically populated by JS -->
-                            </tbody>
+                            <tbody id="bankExpenseTableBody"></tbody>
                         </table>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Middle Column (Form Left Aligned) -->
         <div class="col-mid">
             <div class="form-container">
                 <div class="form-group">
@@ -1067,7 +713,6 @@
                 </div>
             </div>
 
-            <!-- SmartPay Income Panel (Equal Height) -->
             <div class="panel smart-pay-panel">
                 <div class="smart-pay-header">
                     <button class="header-action-btn" id="openSmartPayIncomeModal">
@@ -1080,14 +725,11 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Invoice</th>
-                                    <th>Amount</th>
+                                    <th>Invoice</th><th>Amount</th>
                                     <th style="width: 40px; text-align: center;">Action</th>
                                 </tr>
                             </thead>
-                            <tbody id="smartPayIncomeTableBody">
-                                <!-- Dynamically populated by JS -->
-                            </tbody>
+                            <tbody id="smartPayIncomeTableBody"></tbody>
                         </table>
                     </div>
                 </div>
@@ -1095,7 +737,6 @@
             </div>
         </div>
 
-        <!-- Right Column -->
         <div class="col-right">
             <div class="shift-cash-panel">
                 <div class="shift-cash-header">Shift Cash Result</div>
@@ -1105,106 +746,43 @@
             </div>
 
             <div class="panel denom-panel">
-                <!-- Grand Total Header -->
                 <div class="denom-header" id="denomGrandTotal">0.00</div>
-                
-                <!-- Currency, Currency Count, Total Table -->
                 <table class="denom-table">
                     <thead>
-                        <tr>
-                            <th>Currency</th>
-                            <th style="text-align: center;">Count</th>
-                            <th style="text-align: right;">Total</th>
-                        </tr>
+                        <tr><th>Currency</th><th style="text-align: center;">Count</th><th style="text-align: right;">Total</th></tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td>2000</td>
-                            <td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="2000"></td>
-                            <td class="row-total">0.00</td>
-                        </tr>
-                        <tr>
-                            <td>1000</td>
-                            <td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="1000"></td>
-                            <td class="row-total">0.00</td>
-                        </tr>
-                        <tr>
-                            <td>500</td>
-                            <td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="500"></td>
-                            <td class="row-total">0.00</td>
-                        </tr>
-                        <tr>
-                            <td>200</td>
-                            <td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="200"></td>
-                            <td class="row-total">0.00</td>
-                        </tr>
-                        <tr>
-                            <td>100</td>
-                            <td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="100"></td>
-                            <td class="row-total">0.00</td>
-                        </tr>
-                        <tr>
-                            <td>50</td>
-                            <td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="50"></td>
-                            <td class="row-total">0.00</td>
-                        </tr>
-                        <tr>
-                            <td>20</td>
-                            <td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="20"></td>
-                            <td class="row-total">0.00</td>
-                        </tr>
-                        <tr>
-                            <td>10</td>
-                            <td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="10"></td>
-                            <td class="row-total">0.00</td>
-                        </tr>
-                        <tr>
-                            <td>5</td>
-                            <td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="5"></td>
-                            <td class="row-total">0.00</td>
-                        </tr>
-                        <tr>
-                            <td>1</td>
-                            <td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="1"></td>
-                            <td class="row-total">0.00</td>
-                        </tr>
+                        <tr><td>2000</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="2000"></td><td class="row-total">0.00</td></tr>
+                        <tr><td>1000</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="1000"></td><td class="row-total">0.00</td></tr>
+                        <tr><td>500</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="500"></td><td class="row-total">0.00</td></tr>
+                        <tr><td>200</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="200"></td><td class="row-total">0.00</td></tr>
+                        <tr><td>100</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="100"></td><td class="row-total">0.00</td></tr>
+                        <tr><td>50</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="50"></td><td class="row-total">0.00</td></tr>
+                        <tr><td>20</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="20"></td><td class="row-total">0.00</td></tr>
+                        <tr><td>10</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="10"></td><td class="row-total">0.00</td></tr>
+                        <tr><td>5</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="5"></td><td class="row-total">0.00</td></tr>
+                        <tr><td>1</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="1"></td><td class="row-total">0.00</td></tr>
                     </tbody>
                 </table>
                 <div class="action-buttons">
                     <button class="action-btn" id="calculatorBtn">Calculator</button>
                     <button class="action-btn" id="refreshBtn">Refresh</button>
-                    <button class="action-btn" style="background-color: var(--primary-dark); color: white; border-color: var(--primary-dark);">Deposit</button>
+                    <button class="action-btn save-changes-btn" id="saveChangesBtn">Save Changes</button>
                 </div>
             </div>
         </div>
-
     </div>
 </div>
 
-<!-- EXPENSE ENTRY MODAL (Total Expense) -->
+<!-- Modals -->
 <div class="modal-overlay" id="expenseModal">
     <div class="modal-content">
-        <div class="modal-header">
-            <h3>Add New Expense</h3>
-            <button class="modal-close" id="closeExpenseModal">&times;</button>
-        </div>
+        <div class="modal-header"><h3>Add New Expense</h3><button class="modal-close" id="closeExpenseModal">&times;</button></div>
         <div class="modal-body">
-            <div class="modal-form-group">
-                <label for="expenseCaption">Caption</label>
-                <input type="text" id="expenseCaption" placeholder="e.g., Office Supplies">
-            </div>
-            <div class="modal-form-group">
-                <label for="expenseLedger">Ledger</label>
-                <select id="expenseLedger">
-                    <!-- Populated dynamically from ledgers -->
-                </select>
-            </div>
-            <div class="modal-form-group">
-                <label for="expenseAmount">Amount</label>
-                <input type="number" id="expenseAmount" placeholder="0.00">
-            </div>
-            <div class="modal-form-group">
-                <label for="expenseType">Type</label>
+            <div class="modal-form-group"><label for="expenseCaption">Caption</label><input type="text" id="expenseCaption" placeholder="e.g., Office Supplies"></div>
+            <div class="modal-form-group"><label for="expenseLedger">Ledger</label><select id="expenseLedger"></select></div>
+            <div class="modal-form-group"><label for="expenseAmount">Amount</label><input type="number" id="expenseAmount" placeholder="0.00"></div>
+            <div class="modal-form-group"><label for="expenseType">Type</label>
                 <select id="expenseType">
                     <option value="General">General</option>
                     <option value="Utilities">Utilities</option>
@@ -1220,28 +798,13 @@
     </div>
 </div>
 
-<!-- BANK EXPENSE ENTRY MODAL (SmartPay Expense) -->
 <div class="modal-overlay" id="bankExpenseModal">
     <div class="modal-content">
-        <div class="modal-header">
-            <h3>Bank Expense Entry (SmartPay)</h3>
-            <button class="modal-close" id="closeBankExpenseModal">&times;</button>
-        </div>
+        <div class="modal-header"><h3>Bank Expense Entry (SmartPay)</h3><button class="modal-close" id="closeBankExpenseModal">&times;</button></div>
         <div class="modal-body">
-            <div class="modal-form-group">
-                <label for="bankExpenseCaption">Caption</label>
-                <input type="text" id="bankExpenseCaption" placeholder="e.g., Bank Charges">
-            </div>
-            <div class="modal-form-group">
-                <label for="bankExpenseLedger">Ledger</label>
-                <select id="bankExpenseLedger">
-                    <!-- Populated dynamically from ledgers -->
-                </select>
-            </div>
-            <div class="modal-form-group">
-                <label for="bankExpenseAmount">Amount</label>
-                <input type="number" id="bankExpenseAmount" placeholder="0.00">
-            </div>
+            <div class="modal-form-group"><label for="bankExpenseCaption">Caption</label><input type="text" id="bankExpenseCaption" placeholder="e.g., Bank Charges"></div>
+            <div class="modal-form-group"><label for="bankExpenseLedger">Ledger</label><select id="bankExpenseLedger"></select></div>
+            <div class="modal-form-group"><label for="bankExpenseAmount">Amount</label><input type="number" id="bankExpenseAmount" placeholder="0.00"></div>
         </div>
         <div class="modal-footer">
             <button class="modal-btn modal-btn-cancel" id="cancelBankExpense">Cancel</button>
@@ -1250,22 +813,12 @@
     </div>
 </div>
 
-<!-- SMART PAY INCOME ENTRY MODAL -->
 <div class="modal-overlay" id="smartPayIncomeModal">
     <div class="modal-content">
-        <div class="modal-header">
-            <h3>Smart Pay Income Entry</h3>
-            <button class="modal-close" id="closeSmartPayIncomeModal">&times;</button>
-        </div>
+        <div class="modal-header"><h3>Smart Pay Income Entry</h3><button class="modal-close" id="closeSmartPayIncomeModal">&times;</button></div>
         <div class="modal-body">
-            <div class="modal-form-group">
-                <label for="smartPayInvoice">Invoice</label>
-                <input type="text" id="smartPayInvoice" placeholder="e.g., INV-001">
-            </div>
-            <div class="modal-form-group">
-                <label for="smartPayIncomeAmount">Amount</label>
-                <input type="number" id="smartPayIncomeAmount" placeholder="0.00">
-            </div>
+            <div class="modal-form-group"><label for="smartPayInvoice">Invoice</label><input type="text" id="smartPayInvoice" placeholder="e.g., INV-001"></div>
+            <div class="modal-form-group"><label for="smartPayIncomeAmount">Amount</label><input type="number" id="smartPayIncomeAmount" placeholder="0.00"></div>
         </div>
         <div class="modal-footer">
             <button class="modal-btn modal-btn-cancel" id="cancelSmartPayIncome">Cancel</button>
@@ -1274,39 +827,17 @@
     </div>
 </div>
 
-<!-- LEDGER MANAGEMENT MODAL -->
 <div class="modal-overlay" id="ledgerModal">
     <div class="modal-content">
-        <div class="modal-header">
-            <h3>Manage Ledgers</h3>
-            <button class="modal-close" id="closeLedgerModal">&times;</button>
-        </div>
+        <div class="modal-header"><h3>Manage Ledgers</h3><button class="modal-close" id="closeLedgerModal">&times;</button></div>
         <div class="modal-body">
-            <!-- Add New Ledger Form -->
-            <div class="modal-form-group">
-                <label for="ledgerName">Ledger Name</label>
-                <input type="text" id="ledgerName" placeholder="e.g., Cash Book">
-            </div>
-            <div class="modal-form-group">
-                <label for="ledgerOpeningBalance">Opening Balance</label>
-                <input type="number" id="ledgerOpeningBalance" placeholder="0.00">
-            </div>
-            
-            <!-- List of Existing Ledgers -->
+            <div class="modal-form-group"><label for="ledgerName">Ledger Name</label><input type="text" id="ledgerName" placeholder="e.g., Cash Book"></div>
+            <div class="modal-form-group"><label for="ledgerOpeningBalance">Opening Balance</label><input type="number" id="ledgerOpeningBalance" placeholder="0.00"></div>
             <div style="font-size: 14px; font-weight: 600; color: var(--text-muted); margin-top: 10px;">Existing Ledgers</div>
             <div class="ledger-table-container">
                 <table class="ledger-table">
-                    <thead>
-                        <tr>
-                            <th class="no-col">No.</th>
-                            <th>Ledger Name</th>
-                            <th>Opening Balance</th>
-                            <th class="action-col">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ledgerList">
-                        <!-- Dynamically populated -->
-                    </tbody>
+                    <thead><tr><th class="no-col">No.</th><th>Ledger Name</th><th>Balance</th><th class="action-col">Action</th></tr></thead>
+                    <tbody id="ledgerList"></tbody>
                 </table>
             </div>
         </div>
@@ -1317,7 +848,6 @@
     </div>
 </div>
 
-<!-- LEDGER HISTORY MODAL -->
 <div class="modal-overlay" id="ledgerHistoryModal">
     <div class="modal-content" style="width: 800px;">
         <div class="modal-header">
@@ -1331,16 +861,12 @@
             </div>
         </div>
         <div class="modal-body" style="max-height: 480px;">
-            <!-- Filter Controls -->
             <div style="display: flex; gap: 12px; align-items: center;">
                 <label style="font-size: 14px; font-weight: 500; color: var(--text-muted); min-width: 100px;">Filter by Ledger:</label>
                 <select id="historyLedgerFilter" style="flex: 1; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none;">
                     <option value="all">All Ledgers</option>
-                    <!-- Dynamically populated -->
                 </select>
             </div>
-            
-            <!-- History Table: Date, Particular, Debit, Credit, Balance, Action -->
             <div class="history-table-container">
                 <table class="history-table">
                     <thead>
@@ -1353,9 +879,7 @@
                             <th class="action-col">Action</th>
                         </tr>
                     </thead>
-                    <tbody id="historyTableBody">
-                        <!-- Dynamically populated -->
-                    </tbody>
+                    <tbody id="historyTableBody"></tbody>
                 </table>
             </div>
         </div>
@@ -1365,39 +889,20 @@
     </div>
 </div>
 
-<!-- NEW TRANSACTION MODAL (for Ledger History) -->
 <div class="modal-overlay" id="newTransactionModal">
     <div class="modal-content">
-        <div class="modal-header">
-            <h3>New Ledger Transaction</h3>
-            <button class="modal-close" id="closeNewTransactionModal">&times;</button>
-        </div>
+        <div class="modal-header"><h3>New Ledger Transaction</h3><button class="modal-close" id="closeNewTransactionModal">&times;</button></div>
         <div class="modal-body">
-            <div class="modal-form-group">
-                <label for="txnLedger">Ledger</label>
-                <select id="txnLedger">
-                    <!-- Populated dynamically from ledgers -->
-                </select>
-            </div>
-            <div class="modal-form-group">
-                <label for="txnDate">Date</label>
-                <input type="date" id="txnDate">
-            </div>
-            <div class="modal-form-group">
-                <label for="txnParticular">Particular</label>
-                <input type="text" id="txnParticular" placeholder="e.g., Cash Deposit">
-            </div>
-            <div class="modal-form-group">
-                <label for="txnType">Transaction Type</label>
+            <div class="modal-form-group"><label for="txnLedger">Ledger</label><select id="txnLedger"></select></div>
+            <div class="modal-form-group"><label for="txnDate">Date</label><input type="date" id="txnDate"></div>
+            <div class="modal-form-group"><label for="txnParticular">Particular</label><input type="text" id="txnParticular" placeholder="e.g., Cash Deposit"></div>
+            <div class="modal-form-group"><label for="txnType">Transaction Type</label>
                 <select id="txnType">
                     <option value="Debit">Debit</option>
                     <option value="Credit">Credit</option>
                 </select>
             </div>
-            <div class="modal-form-group">
-                <label for="txnAmount">Amount</label>
-                <input type="number" id="txnAmount" placeholder="0.00">
-            </div>
+            <div class="modal-form-group"><label for="txnAmount">Amount</label><input type="number" id="txnAmount" placeholder="0.00"></div>
         </div>
         <div class="modal-footer">
             <button class="modal-btn modal-btn-cancel" id="cancelNewTransaction">Cancel</button>
@@ -1406,7 +911,6 @@
     </div>
 </div>
 
-<!-- FLOATING CALCULATOR -->
 <div class="calculator-window" id="calculatorWindow">
     <div class="calc-titlebar" id="calcTitlebar">
         <span>Calculator</span>
@@ -1420,1183 +924,1113 @@
         <button class="calc-btn" data-action="backspace">⌫</button>
         <button class="calc-btn operator" data-action="percent">%</button>
         <button class="calc-btn operator" data-action="divide">÷</button>
-        
         <button class="calc-btn" data-action="num" data-value="7">7</button>
         <button class="calc-btn" data-action="num" data-value="8">8</button>
         <button class="calc-btn" data-action="num" data-value="9">9</button>
         <button class="calc-btn operator" data-action="multiply">×</button>
-        
         <button class="calc-btn" data-action="num" data-value="4">4</button>
         <button class="calc-btn" data-action="num" data-value="5">5</button>
         <button class="calc-btn" data-action="num" data-value="6">6</button>
         <button class="calc-btn operator" data-action="subtract">−</button>
-        
         <button class="calc-btn" data-action="num" data-value="1">1</button>
         <button class="calc-btn" data-action="num" data-value="2">2</button>
         <button class="calc-btn" data-action="num" data-value="3">3</button>
         <button class="calc-btn operator" data-action="add">+</button>
-        
         <button class="calc-btn span-two" data-action="num" data-value="0">0</button>
         <button class="calc-btn" data-action="decimal">.</button>
         <button class="calc-btn equals" data-action="equals">=</button>
     </div>
 </div>
 
-<!-- JAVASCRIPT FOR CALCULATIONS & INTERACTIONS -->
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // --- DOM ELEMENTS ---
-        const denomInputs = document.querySelectorAll('.denom-input');
-        const denomGrandTotalEl = document.getElementById('denomGrandTotal');
-        const shiftCashResultEl = document.getElementById('shiftCashResultDisplay');
-        const refreshBtn = document.getElementById('refreshBtn');
-        const clearOpeningBtn = document.getElementById('clearOpeningBtn');
-        const calculatorBtn = document.getElementById('calculatorBtn');
-        const searchInput = document.getElementById('searchInput');
-        
-        const openingInput = document.getElementById('openingInput');
-        const othersInput = document.getElementById('othersInput');
-        const totalBillInput = document.getElementById('totalBillInput');
-        const totalCashInput = document.getElementById('totalCashInput');
-        const expenceInput = document.getElementById('expenceInput');
-        
-        const headerTotalExpensesEl = document.getElementById('headerTotalExpenses');
-        const leftTotalExpenseDisplayEl = document.getElementById('leftTotalExpenseDisplay');
-        const expenseTableBody = document.getElementById('expenseTableBody');
-        
-        const smartPayExpenseDisplayEl = document.getElementById('smartPayExpenseDisplay');
-        const bankExpenseTableBody = document.getElementById('bankExpenseTableBody');
+/* ============================================================
+   SUPABASE SETUP
+   ============================================================ */
+const SUPABASE_URL = 'https://vntdzgzefdtxxrmvipet.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_HQSVM5sV3xvQjGbbgBRA7Q_AhJD_6yC';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const smartPayIncomeDisplayEl = document.getElementById('smartPayIncomeDisplay');
-        const smartPayIncomeTableBody = document.getElementById('smartPayIncomeTableBody');
-        const smartPayBalanceDisplayEl = document.getElementById('smartPayBalanceDisplay');
+document.addEventListener('DOMContentLoaded', function() {
 
-        // Live Clock element
-        const liveClockEl = document.getElementById('liveClock');
+    /* ============ AUTH UI ============ */
+    const authScreen = document.getElementById('authScreen');
+    const appContainer = document.getElementById('appContainer');
+    const tabLogin = document.getElementById('tabLogin');
+    const tabSignup = document.getElementById('tabSignup');
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+    const loginBtn = document.getElementById('loginBtn');
+    const signupBtn = document.getElementById('signupBtn');
+    const loginMsg = document.getElementById('loginMsg');
+    const signupMsg = document.getElementById('signupMsg');
+    const currentUserEl = document.getElementById('currentUser');
+    const connStatusEl = document.getElementById('connStatus');
 
-        // Modal Elements (Total Expense)
-        const expenseModal = document.getElementById('expenseModal');
-        const openExpenseModalBtn = document.getElementById('openExpenseModal');
-        const closeExpenseModalBtn = document.getElementById('closeExpenseModal');
-        const cancelExpenseBtn = document.getElementById('cancelExpense');
-        const submitExpenseBtn = document.getElementById('submitExpense');
-        const expenseCaptionInput = document.getElementById('expenseCaption');
-        const expenseLedgerSelect = document.getElementById('expenseLedger');
-        const expenseAmountInput = document.getElementById('expenseAmount');
-        const expenseTypeSelect = document.getElementById('expenseType');
+    let currentUser = null;
 
-        // Modal Elements (Bank Expense)
-        const bankExpenseModal = document.getElementById('bankExpenseModal');
-        const openBankExpenseModalBtn = document.getElementById('openBankExpenseModal');
-        const closeBankExpenseModalBtn = document.getElementById('closeBankExpenseModal');
-        const cancelBankExpenseBtn = document.getElementById('cancelBankExpense');
-        const submitBankExpenseBtn = document.getElementById('submitBankExpense');
-        const bankExpenseCaptionInput = document.getElementById('bankExpenseCaption');
-        const bankExpenseLedgerSelect = document.getElementById('bankExpenseLedger');
-        const bankExpenseAmountInput = document.getElementById('bankExpenseAmount');
+    tabLogin.addEventListener('click', () => {
+        tabLogin.classList.add('active'); tabSignup.classList.remove('active');
+        loginForm.classList.remove('hidden'); signupForm.classList.add('hidden');
+        loginMsg.textContent = ''; signupMsg.textContent = '';
+    });
+    tabSignup.addEventListener('click', () => {
+        tabSignup.classList.add('active'); tabLogin.classList.remove('active');
+        signupForm.classList.remove('hidden'); loginForm.classList.add('hidden');
+        loginMsg.textContent = ''; signupMsg.textContent = '';
+    });
 
-        // Modal Elements (Smart Pay Income)
-        const smartPayIncomeModal = document.getElementById('smartPayIncomeModal');
-        const openSmartPayIncomeModalBtn = document.getElementById('openSmartPayIncomeModal');
-        const closeSmartPayIncomeModalBtn = document.getElementById('closeSmartPayIncomeModal');
-        const cancelSmartPayIncomeBtn = document.getElementById('cancelSmartPayIncome');
-        const submitSmartPayIncomeBtn = document.getElementById('submitSmartPayIncome');
-        const smartPayInvoiceInput = document.getElementById('smartPayInvoice');
-        const smartPayIncomeAmountInput = document.getElementById('smartPayIncomeAmount');
+    function showAuthScreen() {
+        authScreen.classList.remove('hidden');
+        appContainer.classList.add('hidden');
+    }
+    function showApp(user) {
+        currentUser = user;
+        authScreen.classList.add('hidden');
+        appContainer.classList.remove('hidden');
+        const displayName = user.user_metadata?.username || user.email?.split('@')[0] || 'USER';
+        currentUserEl.textContent = displayName.toUpperCase();
+        connStatusEl.textContent = '● Online';
+        connStatusEl.classList.add('online');
+        connStatusEl.classList.remove('offline');
+        loadAllData();
+    }
 
-        // Modal Elements (Ledger)
-        const ledgerModal = document.getElementById('ledgerModal');
-        const openLedgerModalBtn = document.getElementById('openLedgerModal');
-        const closeLedgerModalBtn = document.getElementById('closeLedgerModal');
-        const cancelLedgerBtn = document.getElementById('cancelLedger');
-        const submitLedgerBtn = document.getElementById('submitLedger');
-        const ledgerNameInput = document.getElementById('ledgerName');
-        const ledgerOpeningBalanceInput = document.getElementById('ledgerOpeningBalance');
-        const ledgerListContainer = document.getElementById('ledgerList');
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        loginMsg.textContent = 'Signing in…'; loginMsg.classList.remove('success');
+        loginBtn.disabled = true;
+        const email = document.getElementById('loginEmail').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        loginBtn.disabled = false;
+        if (error) { loginMsg.textContent = error.message; return; }
+        loginMsg.textContent = 'Success!';
+        loginMsg.classList.add('success');
+    });
 
-        // Modal Elements (Ledger History)
-        const ledgerHistoryModal = document.getElementById('ledgerHistoryModal');
-        const openLedgerHistoryModalBtn = document.getElementById('openLedgerHistoryModal');
-        const closeLedgerHistoryModalBtn = document.getElementById('closeLedgerHistoryModal');
-        const closeHistoryBtn = document.getElementById('closeHistoryBtn');
-        const historyLedgerFilter = document.getElementById('historyLedgerFilter');
-        const historyTableBody = document.getElementById('historyTableBody');
-
-        // Modal Elements (New Transaction)
-        const newTransactionModal = document.getElementById('newTransactionModal');
-        const openNewTransactionModalBtn = document.getElementById('openNewTransactionModal');
-        const closeNewTransactionModalBtn = document.getElementById('closeNewTransactionModal');
-        const cancelNewTransactionBtn = document.getElementById('cancelNewTransaction');
-        const submitNewTransactionBtn = document.getElementById('submitNewTransaction');
-        const txnLedgerSelect = document.getElementById('txnLedger');
-        const txnDateInput = document.getElementById('txnDate');
-        const txnParticularInput = document.getElementById('txnParticular');
-        const txnTypeSelect = document.getElementById('txnType');
-        const txnAmountInput = document.getElementById('txnAmount');
-
-        // Calculator elements
-        const calculatorWindow = document.getElementById('calculatorWindow');
-        const calcTitlebar = document.getElementById('calcTitlebar');
-        const closeCalculatorBtn = document.getElementById('closeCalculatorBtn');
-        const calcDisplay = document.getElementById('calcDisplay');
-
-        // --- STATE ---
-        let totalExpenseAmount = 0.00; 
-        let smartPayExpenseAmount = 0.00; 
-        let smartPayIncomeAmount = 0.00; 
-        let ledgerCounter = 1; 
-        let ledgers = []; // Array of { name, balance }
-        let ledgerHistory = []; // Array of { id, date, ledgerName, caption, type, amount, balanceAfter, isDebit, sourceId }
-        let searchTerm = '';
-        let historyIdCounter = 1;
-
-        // Calculator state
-        let calcCurrentValue = '0';
-        let calcPreviousValue = null;
-        let calcOperation = null;
-        let calcShouldResetDisplay = false;
-
-        // --- 0. LIVE CLOCK ---
-        function updateClock() {
-            const now = new Date();
-            let hours = now.getHours();
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12;
-            hours = hours ? hours : 12;
-            const hoursStr = String(hours).padStart(2, '0');
-            liveClockEl.textContent = `${hoursStr}:${minutes}:${seconds} ${ampm}`;
-        }
-        updateClock();
-        setInterval(updateClock, 1000);
-
-        // --- 1. DATE INITIALIZATION & LOGIC ---
-        const datePicker = document.getElementById('datePicker');
-        const dayDisplay = document.getElementById('dayDisplay');
-
-        function setInitialDate() {
-            const today = new Date();
-            const yyyy = today.getFullYear();
-            const mm = String(today.getMonth() + 1).padStart(2, '0');
-            const dd = String(today.getDate()).padStart(2, '0');
-            datePicker.value = `${yyyy}-${mm}-${dd}`;
-            txnDateInput.value = `${yyyy}-${mm}-${dd}`;
-            
-            updateDateDisplay();
-        }
-
-        function updateDateDisplay() {
-            const selectedDate = new Date(datePicker.value);
-            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-            const dayName = days[selectedDate.getUTCDay()];
-            dayDisplay.textContent = dayName;
-        }
-
-        datePicker.addEventListener('change', updateDateDisplay);
-        setInitialDate(); 
-
-        // --- SEARCH FUNCTIONALITY ---
-        function applySearchFilter() {
-            searchTerm = searchInput.value.trim().toLowerCase();
-            
-            const expenseRows = expenseTableBody.querySelectorAll('tr');
-            expenseRows.forEach(row => {
-                if (row.classList.contains('empty-row')) return;
-                const caption = (row.dataset.caption || '').toLowerCase();
-                const ledgerName = (row.dataset.ledgerName || '').toLowerCase();
-                const type = (row.querySelector('td:nth-child(4)')?.textContent || '').toLowerCase();
-                const amount = (row.dataset.amount || '').toLowerCase();
-                
-                const matches = searchTerm === '' || 
-                    caption.includes(searchTerm) || 
-                    ledgerName.includes(searchTerm) ||
-                    type.includes(searchTerm) ||
-                    amount.includes(searchTerm);
-                
-                row.style.display = matches ? '' : 'none';
-            });
-
-            const bankRows = bankExpenseTableBody.querySelectorAll('tr');
-            bankRows.forEach(row => {
-                if (row.classList.contains('empty-row')) return;
-                const caption = (row.dataset.caption || '').toLowerCase();
-                const ledgerName = (row.dataset.ledgerName || '').toLowerCase();
-                const amount = (row.dataset.amount || '').toLowerCase();
-                
-                const matches = searchTerm === '' || 
-                    caption.includes(searchTerm) || 
-                    ledgerName.includes(searchTerm) ||
-                    amount.includes(searchTerm);
-                
-                row.style.display = matches ? '' : 'none';
-            });
-
-            const incomeRows = smartPayIncomeTableBody.querySelectorAll('tr');
-            incomeRows.forEach(row => {
-                if (row.classList.contains('empty-row')) return;
-                const invoice = (row.cells[0]?.textContent || '').toLowerCase();
-                const amount = (row.dataset.amount || '').toLowerCase();
-                
-                const matches = searchTerm === '' || 
-                    invoice.includes(searchTerm) || 
-                    amount.includes(searchTerm);
-                
-                row.style.display = matches ? '' : 'none';
-            });
-        }
-
-        searchInput.addEventListener('input', applySearchFilter);
-
-        // --- 2. MODAL LOGIC (Total Expense) ---
-        function openExpenseModal() {
-            expenseModal.classList.add('active');
-            expenseCaptionInput.focus();
-        }
-        function closeExpenseModal() {
-            expenseModal.classList.remove('active');
-            expenseCaptionInput.value = '';
-            expenseAmountInput.value = '';
-            expenseTypeSelect.value = 'General';
-        }
-        openExpenseModalBtn.addEventListener('click', openExpenseModal);
-        closeExpenseModalBtn.addEventListener('click', closeExpenseModal);
-        cancelExpenseBtn.addEventListener('click', closeExpenseModal);
-        expenseModal.addEventListener('click', function(e) { if (e.target === expenseModal) closeExpenseModal(); });
-
-        // Enter key in expenseCaption → focus expenseAmount
-        expenseCaptionInput.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                expenseAmountInput.focus();
-                expenseAmountInput.select();
-            }
+    signupForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        signupMsg.textContent = 'Creating account…'; signupMsg.classList.remove('success');
+        signupBtn.disabled = true;
+        const username = document.getElementById('signupName').value.trim();
+        const email = document.getElementById('signupEmail').value.trim();
+        const password = document.getElementById('signupPassword').value;
+        const { data, error } = await sb.auth.signUp({
+            email, password,
+            options: { data: { username } }
         });
-
-        // Enter key in expenseAmount → submit
-        expenseAmountInput.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                submitExpenseBtn.click();
-            }
-        });
-
-        // --- 3. MODAL LOGIC (Bank Expense) ---
-        function openBankExpenseModal() {
-            bankExpenseModal.classList.add('active');
-            bankExpenseCaptionInput.focus();
+        signupBtn.disabled = false;
+        if (error) { signupMsg.textContent = error.message; return; }
+        if (data.session) {
+            signupMsg.textContent = 'Account created! Logging in…';
+            signupMsg.classList.add('success');
+        } else {
+            signupMsg.textContent = 'Account created! Check your email to confirm, then log in.';
+            signupMsg.classList.add('success');
+            setTimeout(() => tabLogin.click(), 1500);
         }
-        function closeBankExpenseModal() {
-            bankExpenseModal.classList.remove('active');
-            bankExpenseCaptionInput.value = '';
-            bankExpenseAmountInput.value = '';
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+        await sb.auth.signOut();
+    });
+
+    sb.auth.onAuthStateChange((event, session) => {
+        if (session && session.user) {
+            showApp(session.user);
+        } else {
+            currentUser = null;
+            showAuthScreen();
+            ledgers = []; ledgerHistory = [];
+            totalExpenseAmount = 0; smartPayExpenseAmount = 0; smartPayIncomeAmount = 0;
+            historyIdCounter = 1;
+            dataLoaded = false;
         }
-        openBankExpenseModalBtn.addEventListener('click', openBankExpenseModal);
-        closeBankExpenseModalBtn.addEventListener('click', closeBankExpenseModal);
-        cancelBankExpenseBtn.addEventListener('click', closeBankExpenseModal);
-        bankExpenseModal.addEventListener('click', function(e) { if (e.target === bankExpenseModal) closeBankExpenseModal(); });
+    });
 
-        // Enter key in bankExpenseCaption → focus bankExpenseAmount
-        bankExpenseCaptionInput.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                bankExpenseAmountInput.focus();
-                bankExpenseAmountInput.select();
-            }
-        });
+    (async () => {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session && session.user) showApp(session.user);
+        else showAuthScreen();
+    })();
 
-        // Enter key in bankExpenseAmount → submit
-        bankExpenseAmountInput.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                submitBankExpenseBtn.click();
-            }
-        });
+    /* ============================================================
+       APP LOGIC
+       ============================================================ */
+    const denomInputs = document.querySelectorAll('.denom-input');
+    const denomGrandTotalEl = document.getElementById('denomGrandTotal');
+    const shiftCashResultEl = document.getElementById('shiftCashResultDisplay');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const clearOpeningBtn = document.getElementById('clearOpeningBtn');
+    const calculatorBtn = document.getElementById('calculatorBtn');
+    const saveChangesBtn = document.getElementById('saveChangesBtn');
+    const searchInput = document.getElementById('searchInput');
 
-        // --- 4. MODAL LOGIC (Smart Pay Income) ---
-        function openSmartPayIncomeModal() {
-            smartPayIncomeModal.classList.add('active');
-            smartPayInvoiceInput.focus();
-        }
-        function closeSmartPayIncomeModal() {
-            smartPayIncomeModal.classList.remove('active');
-            smartPayInvoiceInput.value = '';
-            smartPayIncomeAmountInput.value = '';
-        }
-        openSmartPayIncomeModalBtn.addEventListener('click', openSmartPayIncomeModal);
-        closeSmartPayIncomeModalBtn.addEventListener('click', closeSmartPayIncomeModal);
-        cancelSmartPayIncomeBtn.addEventListener('click', closeSmartPayIncomeModal);
-        smartPayIncomeModal.addEventListener('click', function(e) { if (e.target === smartPayIncomeModal) closeSmartPayIncomeModal(); });
+    const openingInput = document.getElementById('openingInput');
+    const othersInput = document.getElementById('othersInput');
+    const totalBillInput = document.getElementById('totalBillInput');
+    const totalCashInput = document.getElementById('totalCashInput');
+    const expenceInput = document.getElementById('expenceInput');
 
-        // --- 5. MODAL LOGIC (Ledger) ---
-        function openLedgerModal() {
-            ledgerModal.classList.add('active');
-            ledgerNameInput.focus();
-        }
-        function closeLedgerModal() {
-            ledgerModal.classList.remove('active');
-            ledgerNameInput.value = '';
-            ledgerOpeningBalanceInput.value = '';
-        }
-        openLedgerModalBtn.addEventListener('click', openLedgerModal);
-        closeLedgerModalBtn.addEventListener('click', closeLedgerModal);
-        cancelLedgerBtn.addEventListener('click', closeLedgerModal);
-        ledgerModal.addEventListener('click', function(e) { if (e.target === ledgerModal) closeLedgerModal(); });
+    const headerTotalExpensesEl = document.getElementById('headerTotalExpenses');
+    const leftTotalExpenseDisplayEl = document.getElementById('leftTotalExpenseDisplay');
+    const expenseTableBody = document.getElementById('expenseTableBody');
+    const smartPayExpenseDisplayEl = document.getElementById('smartPayExpenseDisplay');
+    const bankExpenseTableBody = document.getElementById('bankExpenseTableBody');
+    const smartPayIncomeDisplayEl = document.getElementById('smartPayIncomeDisplay');
+    const smartPayIncomeTableBody = document.getElementById('smartPayIncomeTableBody');
+    const smartPayBalanceDisplayEl = document.getElementById('smartPayBalanceDisplay');
+    const liveClockEl = document.getElementById('liveClock');
 
-        // --- 6. MODAL LOGIC (Ledger History) ---
-        function openLedgerHistoryModal() {
-            ledgerHistoryModal.classList.add('active');
-            populateHistoryFilter();
-            renderHistoryTable();
-        }
-        function closeLedgerHistoryModal() {
-            ledgerHistoryModal.classList.remove('active');
-            historyLedgerFilter.value = 'all';
-        }
-        openLedgerHistoryModalBtn.addEventListener('click', openLedgerHistoryModal);
-        closeLedgerHistoryModalBtn.addEventListener('click', closeLedgerHistoryModal);
-        closeHistoryBtn.addEventListener('click', closeLedgerHistoryModal);
-        ledgerHistoryModal.addEventListener('click', function(e) { if (e.target === ledgerHistoryModal) closeLedgerHistoryModal(); });
+    const expenseModal = document.getElementById('expenseModal');
+    const openExpenseModalBtn = document.getElementById('openExpenseModal');
+    const closeExpenseModalBtn = document.getElementById('closeExpenseModal');
+    const cancelExpenseBtn = document.getElementById('cancelExpense');
+    const submitExpenseBtn = document.getElementById('submitExpense');
+    const expenseCaptionInput = document.getElementById('expenseCaption');
+    const expenseLedgerSelect = document.getElementById('expenseLedger');
+    const expenseAmountInput = document.getElementById('expenseAmount');
+    const expenseTypeSelect = document.getElementById('expenseType');
 
-        // Filter change
-        historyLedgerFilter.addEventListener('change', renderHistoryTable);
+    const bankExpenseModal = document.getElementById('bankExpenseModal');
+    const openBankExpenseModalBtn = document.getElementById('openBankExpenseModal');
+    const closeBankExpenseModalBtn = document.getElementById('closeBankExpenseModal');
+    const cancelBankExpenseBtn = document.getElementById('cancelBankExpense');
+    const submitBankExpenseBtn = document.getElementById('submitBankExpense');
+    const bankExpenseCaptionInput = document.getElementById('bankExpenseCaption');
+    const bankExpenseLedgerSelect = document.getElementById('bankExpenseLedger');
+    const bankExpenseAmountInput = document.getElementById('bankExpenseAmount');
 
-        // --- 6b. MODAL LOGIC (New Transaction) ---
-        function openNewTransactionModal() {
-            txnLedgerSelect.innerHTML = '';
-            if (ledgers.length === 0) {
-                const placeholder = document.createElement('option');
-                placeholder.value = '';
-                placeholder.textContent = '-- No Ledgers --';
-                placeholder.disabled = true;
-                placeholder.selected = true;
-                txnLedgerSelect.appendChild(placeholder);
-            } else {
-                ledgers.forEach(ledger => {
-                    const option = document.createElement('option');
-                    option.value = ledger.name;
-                    option.textContent = `${ledger.name} (${ledger.balance.toFixed(2)})`;
-                    txnLedgerSelect.appendChild(option);
-                });
-            }
-            const today = new Date();
-            const yyyy = today.getFullYear();
-            const mm = String(today.getMonth() + 1).padStart(2, '0');
-            const dd = String(today.getDate()).padStart(2, '0');
-            txnDateInput.value = `${yyyy}-${mm}-${dd}`;
-            
-            newTransactionModal.classList.add('active');
-            txnParticularInput.focus();
-        }
-        function closeNewTransactionModal() {
-            newTransactionModal.classList.remove('active');
-            txnParticularInput.value = '';
-            txnAmountInput.value = '';
-            txnTypeSelect.value = 'Debit';
-        }
-        openNewTransactionModalBtn.addEventListener('click', openNewTransactionModal);
-        closeNewTransactionModalBtn.addEventListener('click', closeNewTransactionModal);
-        cancelNewTransactionBtn.addEventListener('click', closeNewTransactionModal);
-        newTransactionModal.addEventListener('click', function(e) { if (e.target === newTransactionModal) closeNewTransactionModal(); });
+    const smartPayIncomeModal = document.getElementById('smartPayIncomeModal');
+    const openSmartPayIncomeModalBtn = document.getElementById('openSmartPayIncomeModal');
+    const closeSmartPayIncomeModalBtn = document.getElementById('closeSmartPayIncomeModal');
+    const cancelSmartPayIncomeBtn = document.getElementById('cancelSmartPayIncome');
+    const submitSmartPayIncomeBtn = document.getElementById('submitSmartPayIncome');
+    const smartPayInvoiceInput = document.getElementById('smartPayInvoice');
+    const smartPayIncomeAmountInput = document.getElementById('smartPayIncomeAmount');
 
-        // Submit New Transaction
-        // Debit = decrease balance  |  Credit = increase balance
-        submitNewTransactionBtn.addEventListener('click', function() {
-            const ledgerName = txnLedgerSelect.value;
-            const date = txnDateInput.value;
-            const particular = txnParticularInput.value.trim() || 'Transaction';
-            const type = txnTypeSelect.value;
-            const amount = parseFloat(txnAmountInput.value) || 0;
+    const ledgerModal = document.getElementById('ledgerModal');
+    const openLedgerModalBtn = document.getElementById('openLedgerModal');
+    const closeLedgerModalBtn = document.getElementById('closeLedgerModal');
+    const cancelLedgerBtn = document.getElementById('cancelLedger');
+    const submitLedgerBtn = document.getElementById('submitLedger');
+    const ledgerNameInput = document.getElementById('ledgerName');
+    const ledgerOpeningBalanceInput = document.getElementById('ledgerOpeningBalance');
+    const ledgerListContainer = document.getElementById('ledgerList');
 
-            if (!ledgerName) { alert('Please select a ledger.'); return; }
-            if (!date) { alert('Please select a date.'); return; }
-            if (amount <= 0) { alert('Please enter a valid amount.'); return; }
+    const ledgerHistoryModal = document.getElementById('ledgerHistoryModal');
+    const openLedgerHistoryModalBtn = document.getElementById('openLedgerHistoryModal');
+    const closeLedgerHistoryModalBtn = document.getElementById('closeLedgerHistoryModal');
+    const closeHistoryBtn = document.getElementById('closeHistoryBtn');
+    const historyLedgerFilter = document.getElementById('historyLedgerFilter');
+    const historyTableBody = document.getElementById('historyTableBody');
 
-            const ledger = ledgers.find(l => l.name === ledgerName);
-            if (!ledger) { alert('Ledger not found.'); return; }
+    const newTransactionModal = document.getElementById('newTransactionModal');
+    const openNewTransactionModalBtn = document.getElementById('openNewTransactionModal');
+    const closeNewTransactionModalBtn = document.getElementById('closeNewTransactionModal');
+    const cancelNewTransactionBtn = document.getElementById('cancelNewTransaction');
+    const submitNewTransactionBtn = document.getElementById('submitNewTransaction');
+    const txnLedgerSelect = document.getElementById('txnLedger');
+    const txnDateInput = document.getElementById('txnDate');
+    const txnParticularInput = document.getElementById('txnParticular');
+    const txnTypeSelect = document.getElementById('txnType');
+    const txnAmountInput = document.getElementById('txnAmount');
 
-            // Debit decreases balance (must have enough)  |  Credit increases balance
-            if (type === 'Debit' && amount > ledger.balance) {
-                alert(`Debit amount exceeds available balance of ${ledger.balance.toFixed(2)}.`);
-                return;
-            }
+    const calculatorWindow = document.getElementById('calculatorWindow');
+    const calcTitlebar = document.getElementById('calcTitlebar');
+    const closeCalculatorBtn = document.getElementById('closeCalculatorBtn');
+    const calcDisplay = document.getElementById('calcDisplay');
 
-            if (type === 'Credit') {
-                ledger.balance += amount;
-            } else {
-                ledger.balance -= amount;
-            }
+    let totalExpenseAmount = 0.00;
+    let smartPayExpenseAmount = 0.00;
+    let smartPayIncomeAmount = 0.00;
+    let ledgers = [];
+    let ledgerHistory = [];
+    let searchTerm = '';
+    let historyIdCounter = 1;
+    let dataLoaded = false;
 
-            ledgerHistory.push({
-                id: historyIdCounter++,
-                date: date,
-                ledgerName: ledgerName,
-                caption: particular,
-                type: type,
-                amount: amount,
-                balanceAfter: ledger.balance,
-                isDebit: type === 'Debit',
-                sourceId: null
+    /* ============ LIVE CLOCK ============ */
+    function updateClock() {
+        const now = new Date();
+        let hours = now.getHours();
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12; hours = hours ? hours : 12;
+        liveClockEl.textContent = `${String(hours).padStart(2,'0')}:${minutes}:${seconds} ${ampm}`;
+    }
+    updateClock(); setInterval(updateClock, 1000);
+
+    /* ============ DATE ============ */
+    const datePicker = document.getElementById('datePicker');
+    const dayDisplay = document.getElementById('dayDisplay');
+    function setInitialDate() {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth()+1).padStart(2,'0');
+        const dd = String(today.getDate()).padStart(2,'0');
+        datePicker.value = `${yyyy}-${mm}-${dd}`;
+        txnDateInput.value = `${yyyy}-${mm}-${dd}`;
+        updateDateDisplay();
+    }
+    function updateDateDisplay() {
+        const d = new Date(datePicker.value);
+        const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        dayDisplay.textContent = days[d.getUTCDay()];
+    }
+    datePicker.addEventListener('change', updateDateDisplay);
+    setInitialDate();
+
+    /* ============================================================
+       SUPABASE DATA LOADING
+       ============================================================ */
+    async function loadAllData() {
+        if (!currentUser || dataLoaded) return;
+        dataLoaded = true;
+        connStatusEl.textContent = '● Syncing…';
+        connStatusEl.classList.remove('online','offline');
+
+        try {
+            const { data: ledgersData, error: e1 } = await sb.from('ledgers').select('*').order('created_at');
+            if (e1) throw e1;
+            ledgers = (ledgersData || []).map(r => ({ id: r.id, name: r.name, balance: parseFloat(r.balance) || 0 }));
+
+            const { data: histData, error: e2 } = await sb.from('ledger_history').select('*').order('created_at', { ascending: false });
+            if (e2) throw e2;
+            ledgerHistory = (histData || []).map(r => ({
+                id: r.id, date: r.txn_date, ledgerName: r.ledger_name, caption: r.caption,
+                type: r.txn_type, amount: parseFloat(r.amount) || 0,
+                balanceAfter: parseFloat(r.balance_after) || 0,
+                isDebit: r.is_debit, sourceId: r.source_id
+            }));
+
+            const { data: expData, error: e3 } = await sb.from('expenses').select('*').order('created_at');
+            if (e3) throw e3;
+            totalExpenseAmount = 0;
+            expenseTableBody.innerHTML = '';
+            (expData || []).forEach(r => {
+                addExpenseRow(r.caption, r.ledger_name, parseFloat(r.amount)||0, r.expense_type, r.source_id);
+                totalExpenseAmount += parseFloat(r.amount) || 0;
             });
+            if ((expData||[]).length === 0) renderExpenseEmptyState();
+
+            const { data: bankData, error: e4 } = await sb.from('bank_expenses').select('*').order('created_at');
+            if (e4) throw e4;
+            smartPayExpenseAmount = 0;
+            bankExpenseTableBody.innerHTML = '';
+            (bankData || []).forEach(r => {
+                addBankExpenseRow(r.caption, r.ledger_name, parseFloat(r.amount)||0, r.source_id);
+                smartPayExpenseAmount += parseFloat(r.amount) || 0;
+            });
+            if ((bankData||[]).length === 0) renderBankExpenseEmptyState();
+
+            const { data: incomeData, error: e5 } = await sb.from('smartpay_income').select('*').order('created_at');
+            if (e5) throw e5;
+            smartPayIncomeAmount = 0;
+            smartPayIncomeTableBody.innerHTML = '';
+            (incomeData || []).forEach(r => {
+                addIncomeRow(r.invoice, parseFloat(r.amount)||0);
+                smartPayIncomeAmount += parseFloat(r.amount) || 0;
+            });
+            if ((incomeData||[]).length === 0) renderSmartPayIncomeEmptyState();
 
             renderLedgerList();
             updateLedgerDropdowns();
             populateHistoryFilter();
-            renderHistoryTable();
-            closeNewTransactionModal();
-        });
-
-        // --- Populate History Filter Dropdown ---
-        function populateHistoryFilter() {
-            const currentVal = historyLedgerFilter.value;
-            historyLedgerFilter.innerHTML = '<option value="all">All Ledgers</option>';
-            ledgers.forEach(ledger => {
-                const option = document.createElement('option');
-                option.value = ledger.name;
-                option.textContent = ledger.name;
-                historyLedgerFilter.appendChild(option);
-            });
-            if ([...historyLedgerFilter.options].some(o => o.value === currentVal)) {
-                historyLedgerFilter.value = currentVal;
-            }
-        }
-
-        // --- Render History Table ---
-        // Debit (red)  |  Credit (green)
-        function renderHistoryTable() {
-            const filter = historyLedgerFilter.value;
-            let filtered = ledgerHistory;
-            if (filter !== 'all') {
-                filtered = ledgerHistory.filter(h => h.ledgerName === filter);
-            }
-
-            if (filtered.length === 0) {
-                historyTableBody.innerHTML = `<tr class="empty-row"><td colspan="6">No history records found.</td></tr>`;
-                return;
-            }
-
-            historyTableBody.innerHTML = '';
-            const sorted = [...filtered].reverse();
-            sorted.forEach(record => {
-                const row = document.createElement('tr');
-                let debitDisplay = '';
-                let creditDisplay = '';
-                if (record.isDebit) {
-                    debitDisplay = record.amount.toFixed(2);
-                } else {
-                    creditDisplay = record.amount.toFixed(2);
-                }
-                
-                row.dataset.historyId = record.id;
-                row.innerHTML = `
-                    <td>${record.date}</td>
-                    <td>${record.caption} <span style="color: var(--text-muted); font-size: 12px;">(${record.ledgerName})</span></td>
-                    <td style="text-align: right;" class="debit">${debitDisplay}</td>
-                    <td style="text-align: right;" class="credit">${creditDisplay}</td>
-                    <td style="text-align: right;" class="balance-col">${record.balanceAfter.toFixed(2)}</td>
-                    <td class="action-col">
-                        <button class="btn-delete-row" title="Delete History Entry" data-history-id="${record.id}">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                        </button>
-                    </td>
-                `;
-                historyTableBody.appendChild(row);
-            });
-        }
-
-        // --- Delete from History ---
-        historyTableBody.addEventListener('click', function(e) {
-            const deleteBtn = e.target.closest('.btn-delete-row');
-            if (!deleteBtn) return;
-            
-            const historyId = parseInt(deleteBtn.dataset.historyId);
-            const record = ledgerHistory.find(h => h.id === historyId);
-            if (!record) return;
-            
-            if (!confirm(`Delete this history entry? "${record.caption}" - ${record.amount.toFixed(2)}`)) return;
-            
-            // Reverse the balance effect
-            // Debit → add back to balance  |  Credit → subtract from balance
-            const ledger = ledgers.find(l => l.name === record.ledgerName);
-            if (ledger) {
-                if (record.isDebit) {
-                    ledger.balance += record.amount;
-                } else {
-                    ledger.balance -= record.amount;
-                }
-            }
-            
-            // Remove from history
-            ledgerHistory = ledgerHistory.filter(h => h.id !== historyId);
-            
-            // If this history entry is linked to an expense, remove the expense row too
-            if (record.sourceId) {
-                const allExpenseRows = document.querySelectorAll('#expenseTableBody tr, #bankExpenseTableBody tr, #smartPayIncomeTableBody tr');
-                allExpenseRows.forEach(row => {
-                    if (row.dataset.sourceId === record.sourceId) {
-                        const amount = parseFloat(row.dataset.amount) || 0;
-                        if (row.closest('#expenseTableBody')) {
-                            totalExpenseAmount -= amount;
-                            updateExpenseDisplays();
-                        } else if (row.closest('#bankExpenseTableBody')) {
-                            smartPayExpenseAmount -= amount;
-                            updateSmartPayExpenseDisplay();
-                        } else if (row.closest('#smartPayIncomeTableBody')) {
-                            smartPayIncomeAmount -= amount;
-                            updateSmartPayIncomeDisplay();
-                        }
-                        row.remove();
-                    }
-                });
-                
-                if (expenseTableBody.children.length === 0) renderExpenseEmptyState();
-                if (bankExpenseTableBody.children.length === 0) renderBankExpenseEmptyState();
-                if (smartPayIncomeTableBody.children.length === 0) renderSmartPayIncomeEmptyState();
-            }
-            
-            renderLedgerList();
-            updateLedgerDropdowns();
-            populateHistoryFilter();
-            renderHistoryTable();
-            calculateTotals();
-            applySearchFilter();
-        });
-
-        // --- 7. POPULATE LEDGER DROPDOWNS ---
-        function updateLedgerDropdowns() {
-            expenseLedgerSelect.innerHTML = '';
-            bankExpenseLedgerSelect.innerHTML = '';
-
-            const activeLedgers = ledgers.filter(l => l.balance > 0);
-
-            if (activeLedgers.length === 0) {
-                const placeholder = document.createElement('option');
-                placeholder.value = '';
-                placeholder.textContent = '-- No Ledgers with Balance --';
-                placeholder.disabled = true;
-                placeholder.selected = true;
-                expenseLedgerSelect.appendChild(placeholder);
-                bankExpenseLedgerSelect.appendChild(placeholder.cloneNode(true));
-            } else {
-                activeLedgers.forEach(ledger => {
-                    const option1 = document.createElement('option');
-                    option1.value = ledger.name;
-                    option1.textContent = `${ledger.name} (${ledger.balance.toFixed(2)})`;
-                    expenseLedgerSelect.appendChild(option1);
-
-                    const option2 = document.createElement('option');
-                    option2.value = ledger.name;
-                    option2.textContent = `${ledger.name} (${ledger.balance.toFixed(2)})`;
-                    bankExpenseLedgerSelect.appendChild(option2);
-                });
-            }
-        }
-
-        // --- 8. RENDER EMPTY STATES ---
-        function renderExpenseEmptyState() {
-            expenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="5">No expenses added yet.</td></tr>`;
-        }
-        function renderBankExpenseEmptyState() {
-            bankExpenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="4">No bank expenses added yet.</td></tr>`;
-        }
-        function renderSmartPayIncomeEmptyState() {
-            smartPayIncomeTableBody.innerHTML = `<tr class="empty-row"><td colspan="3">No income added yet.</td></tr>`;
-        }
-        function renderLedgerEmptyState() {
-            ledgerListContainer.innerHTML = `<tr class="empty-row"><td colspan="4">No ledgers added yet.</td></tr>`;
-        }
-
-        // --- Helper: Deduct from ledger (Debit) ---
-        function deductFromLedger(ledgerName, amount, caption, type, sourceId) {
-            const ledger = ledgers.find(l => l.name === ledgerName);
-            if (ledger) {
-                ledger.balance -= amount;
-                const today = new Date();
-                const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-                ledgerHistory.push({
-                    id: historyIdCounter++,
-                    date: dateStr,
-                    ledgerName: ledgerName,
-                    caption: caption,
-                    type: type,
-                    amount: amount,
-                    balanceAfter: ledger.balance,
-                    isDebit: true,
-                    sourceId: sourceId
-                });
-                renderLedgerList();
-                updateLedgerDropdowns();
-            }
-        }
-
-        // --- Helper: Restore to ledger (Credit) ---
-        function restoreToLedger(ledgerName, amount, caption, type, sourceId) {
-            const ledger = ledgers.find(l => l.name === ledgerName);
-            if (ledger) {
-                ledger.balance += amount;
-                const today = new Date();
-                const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-                ledgerHistory.push({
-                    id: historyIdCounter++,
-                    date: dateStr,
-                    ledgerName: ledgerName,
-                    caption: caption,
-                    type: type,
-                    amount: amount,
-                    balanceAfter: ledger.balance,
-                    isDebit: false,
-                    sourceId: sourceId
-                });
-                renderLedgerList();
-                updateLedgerDropdowns();
-            }
-        }
-
-        // --- Render Ledger List ---
-        function renderLedgerList() {
-            if (ledgers.length === 0) {
-                renderLedgerEmptyState();
-                return;
-            }
-            ledgerListContainer.innerHTML = '';
-            ledgers.forEach((ledger, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="no-col">${index + 1}</td>
-                    <td>${ledger.name}</td>
-                    <td>${ledger.balance.toFixed(2)}</td>
-                    <td class="action-col">
-                        <button class="btn-delete-row" title="Delete Ledger" data-ledger-name="${ledger.name}">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                        </button>
-                    </td>
-                `;
-                ledgerListContainer.appendChild(row);
-            });
-        }
-
-        // --- 9. SUBMIT HANDLERS ---
-        
-        submitExpenseBtn.addEventListener('click', function() {
-            const caption = expenseCaptionInput.value.trim() || 'Unnamed Expense';
-            const ledgerName = expenseLedgerSelect.value;
-            const amount = parseFloat(expenseAmountInput.value) || 0;
-            const type = expenseTypeSelect.value;
-
-            if (!ledgerName) { alert('Please select a ledger first. Add a ledger from File > Ledger.'); return; }
-            
-            const ledger = ledgers.find(l => l.name === ledgerName);
-            if (!ledger) { alert('Selected ledger not found.'); return; }
-            
-            if (ledger.balance <= 0) {
-                alert(`Ledger "${ledgerName}" has zero balance. Expense entry not allowed.`);
-                return;
-            }
-            if (amount <= 0) { alert('Please enter a valid amount.'); return; }
-            if (amount > ledger.balance) {
-                alert(`Amount exceeds available balance of ${ledger.balance.toFixed(2)} in ledger "${ledgerName}".`);
-                return;
-            }
-
-            const sourceId = 'exp-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
-            
-            deductFromLedger(ledgerName, amount, caption, type, sourceId);
-
-            const emptyRow = expenseTableBody.querySelector('.empty-row');
-            if (emptyRow) emptyRow.remove();
-
-            const newRow = document.createElement('tr');
-            newRow.innerHTML = `
-                <td>${caption}</td>
-                <td>${ledgerName}</td>
-                <td>${amount.toFixed(2)}</td>
-                <td>${type}</td>
-                <td style="text-align: center;">
-                    <button class="btn-delete-row" title="Delete Expense">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                    </button>
-                </td>
-            `;
-            newRow.dataset.amount = amount;
-            newRow.dataset.ledgerName = ledgerName;
-            newRow.dataset.caption = caption;
-            newRow.dataset.type = type;
-            newRow.dataset.sourceId = sourceId;
-            expenseTableBody.appendChild(newRow);
-
-            totalExpenseAmount += amount;
             updateExpenseDisplays();
-            calculateTotals();
-            applySearchFilter();
-            closeExpenseModal();
-        });
-
-        submitBankExpenseBtn.addEventListener('click', function() {
-            const caption = bankExpenseCaptionInput.value.trim() || 'Unnamed Bank Expense';
-            const ledgerName = bankExpenseLedgerSelect.value;
-            const amount = parseFloat(bankExpenseAmountInput.value) || 0;
-
-            if (!ledgerName) { alert('Please select a ledger first. Add a ledger from File > Ledger.'); return; }
-            
-            const ledger = ledgers.find(l => l.name === ledgerName);
-            if (!ledger) { alert('Selected ledger not found.'); return; }
-            
-            if (ledger.balance <= 0) {
-                alert(`Ledger "${ledgerName}" has zero balance. Expense entry not allowed.`);
-                return;
-            }
-            if (amount <= 0) { alert('Please enter a valid amount.'); return; }
-            if (amount > ledger.balance) {
-                alert(`Amount exceeds available balance of ${ledger.balance.toFixed(2)} in ledger "${ledgerName}".`);
-                return;
-            }
-
-            const sourceId = 'bnk-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
-            
-            deductFromLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
-
-            const emptyRow = bankExpenseTableBody.querySelector('.empty-row');
-            if (emptyRow) emptyRow.remove();
-
-            const newRow = document.createElement('tr');
-            newRow.innerHTML = `
-                <td>${caption}</td>
-                <td>${ledgerName}</td>
-                <td>${amount.toFixed(2)}</td>
-                <td style="text-align: center;">
-                    <button class="btn-delete-row" title="Delete Expense">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                    </button>
-                </td>
-            `;
-            newRow.dataset.amount = amount;
-            newRow.dataset.ledgerName = ledgerName;
-            newRow.dataset.caption = caption;
-            newRow.dataset.sourceId = sourceId;
-            bankExpenseTableBody.appendChild(newRow);
-
-            smartPayExpenseAmount += amount;
             updateSmartPayExpenseDisplay();
-            calculateTotals();
-            applySearchFilter();
-            closeBankExpenseModal();
-        });
-
-        submitSmartPayIncomeBtn.addEventListener('click', function() {
-            const invoice = smartPayInvoiceInput.value.trim() || 'Unnamed Invoice';
-            const amount = parseFloat(smartPayIncomeAmountInput.value) || 0;
-
-            if (amount <= 0) { alert('Please enter a valid amount.'); return; }
-
-            const emptyRow = smartPayIncomeTableBody.querySelector('.empty-row');
-            if (emptyRow) emptyRow.remove();
-
-            const newRow = document.createElement('tr');
-            newRow.innerHTML = `
-                <td>${invoice}</td>
-                <td>${amount.toFixed(2)}</td>
-                <td style="text-align: center;">
-                    <button class="btn-delete-row" title="Delete Income">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                    </button>
-                </td>
-            `;
-            newRow.dataset.amount = amount;
-            smartPayIncomeTableBody.appendChild(newRow);
-
-            smartPayIncomeAmount += amount;
             updateSmartPayIncomeDisplay();
             calculateTotals();
             applySearchFilter();
-            closeSmartPayIncomeModal();
-        });
 
-        submitLedgerBtn.addEventListener('click', function() {
-            const name = ledgerNameInput.value.trim();
-            const balance = parseFloat(ledgerOpeningBalanceInput.value) || 0;
-
-            if (!name) { alert('Please enter a ledger name.'); return; }
-            if (balance < 0) { alert('Opening balance cannot be negative.'); return; }
-            if (ledgers.some(l => l.name === name)) { alert('Ledger with this name already exists.'); return; }
-
-            ledgers.push({ name: name, balance: balance });
-
-            const today = new Date();
-            const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-            ledgerHistory.push({
-                id: historyIdCounter++,
-                date: dateStr,
-                ledgerName: name,
-                caption: 'Opening Balance',
-                type: 'Opening',
-                amount: balance,
-                balanceAfter: balance,
-                isDebit: false,
-                sourceId: null
-            });
-
-            renderLedgerList();
-            updateLedgerDropdowns();
-            populateHistoryFilter();
-
-            ledgerNameInput.value = '';
-            ledgerOpeningBalanceInput.value = '';
-            ledgerNameInput.focus();
-        });
-
-        // --- 10. DELETE HANDLERS (Expense rows - also remove linked history) ---
-        expenseTableBody.addEventListener('click', function(e) {
-            const deleteBtn = e.target.closest('.btn-delete-row');
-            if (deleteBtn) {
-                const row = deleteBtn.closest('tr');
-                const amount = parseFloat(row.dataset.amount) || 0;
-                const ledgerName = row.dataset.ledgerName;
-                const caption = row.dataset.caption || 'Deleted Expense';
-                const type = row.dataset.type || 'General';
-                const sourceId = row.dataset.sourceId;
-                totalExpenseAmount -= amount;
-                if (ledgerName) {
-                    restoreToLedger(ledgerName, amount, caption, type, sourceId);
-                }
-                if (sourceId) {
-                    ledgerHistory = ledgerHistory.filter(h => h.sourceId !== sourceId);
-                }
-                updateExpenseDisplays();
-                row.remove();
-                if (expenseTableBody.children.length === 0) renderExpenseEmptyState();
-                calculateTotals();
-                applySearchFilter();
-                renderHistoryTable();
-            }
-        });
-
-        bankExpenseTableBody.addEventListener('click', function(e) {
-            const deleteBtn = e.target.closest('.btn-delete-row');
-            if (deleteBtn) {
-                const row = deleteBtn.closest('tr');
-                const amount = parseFloat(row.dataset.amount) || 0;
-                const ledgerName = row.dataset.ledgerName;
-                const caption = row.dataset.caption || 'Deleted Bank Expense';
-                const sourceId = row.dataset.sourceId;
-                smartPayExpenseAmount -= amount;
-                if (ledgerName) {
-                    restoreToLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
-                }
-                if (sourceId) {
-                    ledgerHistory = ledgerHistory.filter(h => h.sourceId !== sourceId);
-                }
-                updateSmartPayExpenseDisplay();
-                row.remove();
-                if (bankExpenseTableBody.children.length === 0) renderBankExpenseEmptyState();
-                calculateTotals();
-                applySearchFilter();
-                renderHistoryTable();
-            }
-        });
-
-        smartPayIncomeTableBody.addEventListener('click', function(e) {
-            const deleteBtn = e.target.closest('.btn-delete-row');
-            if (deleteBtn) {
-                const row = deleteBtn.closest('tr');
-                const amount = parseFloat(row.dataset.amount) || 0;
-                smartPayIncomeAmount -= amount;
-                updateSmartPayIncomeDisplay();
-                row.remove();
-                if (smartPayIncomeTableBody.children.length === 0) renderSmartPayIncomeEmptyState();
-                calculateTotals();
-                applySearchFilter();
-            }
-        });
-
-        ledgerListContainer.addEventListener('click', function(e) {
-            const deleteBtn = e.target.closest('.btn-delete-row');
-            if (deleteBtn) {
-                const ledgerName = deleteBtn.dataset.ledgerName;
-                if (confirm(`Delete ledger "${ledgerName}"? This will remove all its history.`)) {
-                    ledgers = ledgers.filter(l => l.name !== ledgerName);
-                    ledgerHistory = ledgerHistory.filter(h => h.ledgerName !== ledgerName);
-                    renderLedgerList();
-                    updateLedgerDropdowns();
-                    populateHistoryFilter();
-                    renderHistoryTable();
-                }
-            }
-        });
-
-        // --- 11. DISPLAY UPDATERS ---
-        function updateExpenseDisplays() {
-            const netExpense = totalExpenseAmount - smartPayExpenseAmount;
-            const formatted = netExpense.toFixed(2);
-            headerTotalExpensesEl.textContent = formatted;
-            leftTotalExpenseDisplayEl.textContent = totalExpenseAmount.toFixed(2);
+            connStatusEl.textContent = '● Online';
+            connStatusEl.classList.add('online');
+        } catch (err) {
+            console.error('Load error:', err);
+            connStatusEl.textContent = '● Sync error';
+            connStatusEl.classList.add('offline');
+            alert('Error loading data: ' + err.message);
         }
+    }
 
-        function updateSmartPayExpenseDisplay() {
-            smartPayExpenseDisplayEl.textContent = smartPayExpenseAmount.toFixed(2);
-        }
+    /* ============================================================
+       RENDER HELPERS
+       ============================================================ */
+    function renderExpenseEmptyState() {
+        expenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="5">No expenses added yet.</td></tr>`;
+    }
+    function renderBankExpenseEmptyState() {
+        bankExpenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="4">No bank expenses added yet.</td></tr>`;
+    }
+    function renderSmartPayIncomeEmptyState() {
+        smartPayIncomeTableBody.innerHTML = `<tr class="empty-row"><td colspan="3">No income added yet.</td></tr>`;
+    }
+    function renderLedgerEmptyState() {
+        ledgerListContainer.innerHTML = `<tr class="empty-row"><td colspan="4">No ledgers added yet.</td></tr>`;
+    }
 
-        function updateSmartPayIncomeDisplay() {
-            smartPayIncomeDisplayEl.textContent = smartPayIncomeAmount.toFixed(2);
-            const balance = smartPayIncomeAmount - smartPayExpenseAmount;
-            smartPayBalanceDisplayEl.textContent = balance.toFixed(2);
-        }
+    function addExpenseRow(caption, ledgerName, amount, type, sourceId) {
+        const emptyRow = expenseTableBody.querySelector('.empty-row');
+        if (emptyRow) emptyRow.remove();
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td>${caption}</td><td>${ledgerName}</td><td>${amount.toFixed(2)}</td><td>${type}</td>
+            <td style="text-align: center;">
+                <button class="btn-delete-row" title="Delete Expense">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                </button>
+            </td>`;
+        newRow.dataset.amount = amount;
+        newRow.dataset.ledgerName = ledgerName;
+        newRow.dataset.caption = caption;
+        newRow.dataset.type = type;
+        newRow.dataset.sourceId = sourceId || '';
+        expenseTableBody.appendChild(newRow);
+    }
 
-        // --- Initialize ---
-        renderExpenseEmptyState();
-        renderBankExpenseEmptyState();
-        renderSmartPayIncomeEmptyState();
-        renderLedgerEmptyState();
-        updateLedgerDropdowns();
-        updateExpenseDisplays();
-        updateSmartPayExpenseDisplay();
-        updateSmartPayIncomeDisplay();
+    function addBankExpenseRow(caption, ledgerName, amount, sourceId) {
+        const emptyRow = bankExpenseTableBody.querySelector('.empty-row');
+        if (emptyRow) emptyRow.remove();
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td>${caption}</td><td>${ledgerName}</td><td>${amount.toFixed(2)}</td>
+            <td style="text-align: center;">
+                <button class="btn-delete-row" title="Delete Expense">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                </button>
+            </td>`;
+        newRow.dataset.amount = amount;
+        newRow.dataset.ledgerName = ledgerName;
+        newRow.dataset.caption = caption;
+        newRow.dataset.sourceId = sourceId || '';
+        bankExpenseTableBody.appendChild(newRow);
+    }
 
-        // --- 12. CALCULATION LOGIC ---
-        function calculateTotals() {
-            let grandTotal = 0;
-            denomInputs.forEach(input => {
-                const currencyValue = parseFloat(input.getAttribute('data-currency')) || 0;
-                const count = parseFloat(input.value) || 0;
-                const total = currencyValue * count;
-                const rowTotalEl = input.closest('tr').querySelector('.row-total');
-                rowTotalEl.textContent = total.toFixed(2);
-                grandTotal += total;
-            });
-            const formattedTotal = grandTotal.toFixed(2);
-            denomGrandTotalEl.textContent = formattedTotal;
-            totalCashInput.value = formattedTotal;
+    function addIncomeRow(invoice, amount) {
+        const emptyRow = smartPayIncomeTableBody.querySelector('.empty-row');
+        if (emptyRow) emptyRow.remove();
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td>${invoice}</td><td>${amount.toFixed(2)}</td>
+            <td style="text-align: center;">
+                <button class="btn-delete-row" title="Delete Income">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                </button>
+            </td>`;
+        newRow.dataset.amount = amount;
+        smartPayIncomeTableBody.appendChild(newRow);
+    }
 
-            const opening = parseFloat(openingInput.value) || 0;
-            const others = parseFloat(othersInput.value) || 0;
-            const totalBill = opening + others;
-            totalBillInput.value = totalBill.toFixed(2);
+    /* ============ MODALS ============ */
+    function openModal(m) { m.classList.add('active'); }
+    function closeModal(m) { m.classList.remove('active'); }
 
-            const combinedExpense = totalExpenseAmount + smartPayExpenseAmount;
-            const shiftCashResult = totalBill - combinedExpense - grandTotal + smartPayIncomeAmount;
-            
-            if (Math.abs(shiftCashResult) < 0.001) { 
-                shiftCashResultEl.textContent = 'Tally';
-                shiftCashResultEl.classList.add('tally');
-            } else {
-                shiftCashResultEl.textContent = shiftCashResult.toFixed(2);
-                shiftCashResultEl.classList.remove('tally');
-            }
+    openExpenseModalBtn.addEventListener('click', () => { openModal(expenseModal); expenseCaptionInput.focus(); });
+    closeExpenseModalBtn.addEventListener('click', () => closeModal(expenseModal));
+    cancelExpenseBtn.addEventListener('click', () => closeModal(expenseModal));
+    expenseModal.addEventListener('click', e => { if (e.target === expenseModal) closeModal(expenseModal); });
+    expenseCaptionInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); expenseAmountInput.focus(); expenseAmountInput.select(); }
+    });
+    expenseAmountInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); submitExpenseBtn.click(); }
+    });
 
-            expenceInput.value = totalExpenseAmount.toFixed(2);
-        }
+    openBankExpenseModalBtn.addEventListener('click', () => { openModal(bankExpenseModal); bankExpenseCaptionInput.focus(); });
+    closeBankExpenseModalBtn.addEventListener('click', () => closeModal(bankExpenseModal));
+    cancelBankExpenseBtn.addEventListener('click', () => closeModal(bankExpenseModal));
+    bankExpenseModal.addEventListener('click', e => { if (e.target === bankExpenseModal) closeModal(bankExpenseModal); });
+    bankExpenseCaptionInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); bankExpenseAmountInput.focus(); bankExpenseAmountInput.select(); }
+    });
+    bankExpenseAmountInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); submitBankExpenseBtn.click(); }
+    });
 
-        // --- 13. EVENT LISTENERS (Inputs) ---
-        denomInputs.forEach(input => {
-            input.addEventListener('input', calculateTotals);
-            input.addEventListener('change', calculateTotals);
-        });
+    openSmartPayIncomeModalBtn.addEventListener('click', () => { openModal(smartPayIncomeModal); smartPayInvoiceInput.focus(); });
+    closeSmartPayIncomeModalBtn.addEventListener('click', () => closeModal(smartPayIncomeModal));
+    cancelSmartPayIncomeBtn.addEventListener('click', () => closeModal(smartPayIncomeModal));
+    smartPayIncomeModal.addEventListener('click', e => { if (e.target === smartPayIncomeModal) closeModal(smartPayIncomeModal); });
 
-        openingInput.addEventListener('input', calculateTotals);
-        othersInput.addEventListener('input', calculateTotals);
+    openLedgerModalBtn.addEventListener('click', () => { openModal(ledgerModal); ledgerNameInput.focus(); });
+    closeLedgerModalBtn.addEventListener('click', () => closeModal(ledgerModal));
+    cancelLedgerBtn.addEventListener('click', () => closeModal(ledgerModal));
+    ledgerModal.addEventListener('click', e => { if (e.target === ledgerModal) closeModal(ledgerModal); });
 
-        // --- 13b. CLEAR OPENING & OTHERS BUTTON ---
-        clearOpeningBtn.addEventListener('click', function() {
-            openingInput.value = '';
-            othersInput.value = '';
-            calculateTotals();
-            openingInput.focus();
-        });
+    openLedgerHistoryModalBtn.addEventListener('click', () => {
+        openModal(ledgerHistoryModal);
+        populateHistoryFilter(); renderHistoryTable();
+    });
+    closeLedgerHistoryModalBtn.addEventListener('click', () => closeModal(ledgerHistoryModal));
+    closeHistoryBtn.addEventListener('click', () => closeModal(ledgerHistoryModal));
+    ledgerHistoryModal.addEventListener('click', e => { if (e.target === ledgerHistoryModal) closeModal(ledgerHistoryModal); });
 
-        // --- 13c. ENTER KEY NAVIGATION: Opening → Others → First Denom Input ---
-        openingInput.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                othersInput.focus();
-                othersInput.select();
-            }
-        });
+    historyLedgerFilter.addEventListener('change', renderHistoryTable);
 
-        othersInput.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                const firstDenom = document.querySelector('.denom-input');
-                if (firstDenom) {
-                    firstDenom.focus();
-                    firstDenom.select();
-                }
-            }
-        });
-
-        // --- 14. ENTER KEY NAVIGATION (Denom inputs) ---
-        denomInputs.forEach((input, index) => {
-            input.addEventListener('keydown', function(event) {
-                if (event.key === 'Enter') {
-                    event.preventDefault(); 
-                    const nextIndex = (index + 1) % denomInputs.length; 
-                    const nextInput = denomInputs[nextIndex];
-                    nextInput.focus();
-                    nextInput.select(); 
-                }
-            });
-        });
-
-        // --- 15. REFRESH BUTTON LOGIC ---
-        refreshBtn.addEventListener('click', function() {
-            denomInputs.forEach(input => { input.value = ''; });
-            denomGrandTotalEl.textContent = '0.00';
-            totalCashInput.value = '0.00';
-            document.querySelectorAll('.row-total').forEach(el => { el.textContent = '0.00'; });
-            calculateTotals();
-        });
-
-        // --- 16. FLOATING CALCULATOR LOGIC ---
-        function updateCalcDisplay() {
-            calcDisplay.textContent = calcCurrentValue;
-        }
-
-        function calcInputNumber(num) {
-            if (calcShouldResetDisplay) {
-                calcCurrentValue = num;
-                calcShouldResetDisplay = false;
-            } else {
-                if (calcCurrentValue === '0') {
-                    calcCurrentValue = num;
-                } else {
-                    calcCurrentValue += num;
-                }
-            }
-            updateCalcDisplay();
-        }
-
-        function calcInputDecimal() {
-            if (calcShouldResetDisplay) {
-                calcCurrentValue = '0.';
-                calcShouldResetDisplay = false;
-            } else if (!calcCurrentValue.includes('.')) {
-                calcCurrentValue += '.';
-            }
-            updateCalcDisplay();
-        }
-
-        function calcClear() {
-            calcCurrentValue = '0';
-            calcPreviousValue = null;
-            calcOperation = null;
-            calcShouldResetDisplay = false;
-            updateCalcDisplay();
-        }
-
-        function calcBackspace() {
-            if (calcCurrentValue.length === 1 || (calcCurrentValue.length === 2 && calcCurrentValue.startsWith('-'))) {
-                calcCurrentValue = '0';
-            } else {
-                calcCurrentValue = calcCurrentValue.slice(0, -1);
-            }
-            updateCalcDisplay();
-        }
-
-        function calcPercent() {
-            const current = parseFloat(calcCurrentValue);
-            if (!isNaN(current)) {
-                calcCurrentValue = String(current / 100);
-                updateCalcDisplay();
-            }
-        }
-
-        function calcOperationHandler(op) {
-            const current = parseFloat(calcCurrentValue);
-            if (calcPreviousValue !== null && calcOperation && !calcShouldResetDisplay) {
-                const result = performCalc(calcPreviousValue, current, calcOperation);
-                calcCurrentValue = String(result);
-                updateCalcDisplay();
-                calcPreviousValue = result;
-            } else {
-                calcPreviousValue = current;
-            }
-            calcOperation = op;
-            calcShouldResetDisplay = true;
-        }
-
-        function performCalc(prev, curr, op) {
-            switch (op) {
-                case 'add': return prev + curr;
-                case 'subtract': return prev - curr;
-                case 'multiply': return prev * curr;
-                case 'divide': return curr !== 0 ? prev / curr : 0;
-                default: return curr;
-            }
-        }
-
-        function calcEquals() {
-            const current = parseFloat(calcCurrentValue);
-            if (calcPreviousValue !== null && calcOperation) {
-                const result = performCalc(calcPreviousValue, current, calcOperation);
-                calcCurrentValue = String(result);
-                calcPreviousValue = null;
-                calcOperation = null;
-                calcShouldResetDisplay = true;
-                updateCalcDisplay();
-            }
-        }
-
-        document.querySelectorAll('.calc-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const action = this.dataset.action;
-                if (action === 'num') {
-                    calcInputNumber(this.dataset.value);
-                } else if (action === 'decimal') {
-                    calcInputDecimal();
-                } else if (action === 'clear') {
-                    calcClear();
-                } else if (action === 'backspace') {
-                    calcBackspace();
-                } else if (action === 'percent') {
-                    calcPercent();
-                } else if (action === 'add' || action === 'subtract' || action === 'multiply' || action === 'divide') {
-                    calcOperationHandler(action);
-                } else if (action === 'equals') {
-                    calcEquals();
-                }
-            });
-        });
-
-        calculatorBtn.addEventListener('click', function() {
-            calculatorWindow.classList.add('active');
-        });
-
-        closeCalculatorBtn.addEventListener('click', function() {
-            calculatorWindow.classList.remove('active');
-        });
-
-        let isDragging = false;
-        let dragOffsetX = 0;
-        let dragOffsetY = 0;
-
-        calcTitlebar.addEventListener('mousedown', function(e) {
-            if (e.target.closest('.calc-titlebar-btn')) return;
-            isDragging = true;
-            const rect = calculatorWindow.getBoundingClientRect();
-            dragOffsetX = e.clientX - rect.left;
-            dragOffsetY = e.clientY - rect.top;
-            e.preventDefault();
-        });
-
-        document.addEventListener('mousemove', function(e) {
-            if (!isDragging) return;
-            const newLeft = e.clientX - dragOffsetX;
-            const newTop = e.clientY - dragOffsetY;
-            calculatorWindow.style.left = newLeft + 'px';
-            calculatorWindow.style.top = newTop + 'px';
-        });
-
-        document.addEventListener('mouseup', function() {
-            isDragging = false;
-        });
-
-        updateCalcDisplay();
-        calculateTotals();
-
-        if (ledgers.length > 0) {
-            renderLedgerList();
+    openNewTransactionModalBtn.addEventListener('click', () => {
+        txnLedgerSelect.innerHTML = '';
+        if (ledgers.length === 0) {
+            const o = document.createElement('option'); o.value=''; o.textContent='-- No Ledgers --'; o.disabled=true; o.selected=true;
+            txnLedgerSelect.appendChild(o);
         } else {
-            renderLedgerEmptyState();
+            ledgers.forEach(l => {
+                const o = document.createElement('option'); o.value = l.name; o.textContent = `${l.name} (${l.balance.toFixed(2)})`;
+                txnLedgerSelect.appendChild(o);
+            });
+        }
+        const today = new Date();
+        txnDateInput.value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        openModal(newTransactionModal);
+        txnParticularInput.focus();
+    });
+    closeNewTransactionModalBtn.addEventListener('click', () => closeModal(newTransactionModal));
+    cancelNewTransactionBtn.addEventListener('click', () => closeModal(newTransactionModal));
+    newTransactionModal.addEventListener('click', e => { if (e.target === newTransactionModal) closeModal(newTransactionModal); });
+
+    /* ============ LEDGER DROPDOWNS ============ */
+    function updateLedgerDropdowns() {
+        expenseLedgerSelect.innerHTML = '';
+        bankExpenseLedgerSelect.innerHTML = '';
+        const active = ledgers.filter(l => l.balance > 0);
+        if (active.length === 0) {
+            const p = document.createElement('option');
+            p.value=''; p.textContent='-- No Ledgers with Balance --'; p.disabled=true; p.selected=true;
+            expenseLedgerSelect.appendChild(p);
+            bankExpenseLedgerSelect.appendChild(p.cloneNode(true));
+        } else {
+            active.forEach(l => {
+                const o1 = document.createElement('option'); o1.value = l.name; o1.textContent = `${l.name} (${l.balance.toFixed(2)})`;
+                expenseLedgerSelect.appendChild(o1);
+                bankExpenseLedgerSelect.appendChild(o1.cloneNode(true));
+            });
+        }
+    }
+
+    function populateHistoryFilter() {
+        const cur = historyLedgerFilter.value;
+        historyLedgerFilter.innerHTML = '<option value="all">All Ledgers</option>';
+        ledgers.forEach(l => {
+            const o = document.createElement('option'); o.value = l.name; o.textContent = l.name;
+            historyLedgerFilter.appendChild(o);
+        });
+        if ([...historyLedgerFilter.options].some(o => o.value === cur)) historyLedgerFilter.value = cur;
+    }
+
+    function renderHistoryTable() {
+        const filter = historyLedgerFilter.value;
+        let filtered = filter === 'all' ? ledgerHistory : ledgerHistory.filter(h => h.ledgerName === filter);
+        if (filtered.length === 0) {
+            historyTableBody.innerHTML = `<tr class="empty-row"><td colspan="6">No history records found.</td></tr>`;
+            return;
+        }
+        historyTableBody.innerHTML = '';
+        [...filtered].forEach(record => {
+            const row = document.createElement('tr');
+            const debitDisplay = record.isDebit ? record.amount.toFixed(2) : '';
+            const creditDisplay = !record.isDebit ? record.amount.toFixed(2) : '';
+            row.dataset.historyId = record.id;
+            row.innerHTML = `
+                <td>${record.date}</td>
+                <td>${record.caption} <span style="color: var(--text-muted); font-size: 12px;">(${record.ledgerName})</span></td>
+                <td style="text-align: right;" class="debit">${debitDisplay}</td>
+                <td style="text-align: right;" class="credit">${creditDisplay}</td>
+                <td style="text-align: right;" class="balance-col">${record.balanceAfter.toFixed(2)}</td>
+                <td class="action-col">
+                    <button class="btn-delete-row" title="Delete History Entry" data-history-id="${record.id}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>
+                </td>`;
+            historyTableBody.appendChild(row);
+        });
+    }
+
+    function renderLedgerList() {
+        if (ledgers.length === 0) { renderLedgerEmptyState(); return; }
+        ledgerListContainer.innerHTML = '';
+        ledgers.forEach((l, i) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="no-col">${i+1}</td>
+                <td>${l.name}</td>
+                <td>${l.balance.toFixed(2)}</td>
+                <td class="action-col">
+                    <button class="btn-delete-row" title="Delete Ledger" data-ledger-name="${l.name}" data-ledger-id="${l.id}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>
+                </td>`;
+            ledgerListContainer.appendChild(row);
+        });
+    }
+
+    /* ============ HELPER: Ledger balance changes ============ */
+    async function deductFromLedger(ledgerName, amount, caption, type, sourceId) {
+        const ledger = ledgers.find(l => l.name === ledgerName);
+        if (!ledger) return;
+        ledger.balance -= amount;
+        const today = new Date();
+        const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        const histEntry = {
+            user_id: currentUser.id, ledger_name: ledgerName, txn_date: dateStr,
+            caption, txn_type: type, amount, balance_after: ledger.balance,
+            is_debit: true, source_id: sourceId
+        };
+        const { data, error } = await sb.from('ledger_history').insert(histEntry).select().single();
+        if (error) { console.error(error); alert('DB error: ' + error.message); return; }
+        await sb.from('ledgers').update({ balance: ledger.balance }).eq('id', ledger.id);
+        ledgerHistory.unshift({
+            id: data.id, date: data.txn_date, ledgerName: data.ledger_name,
+            caption: data.caption, type: data.txn_type, amount: parseFloat(data.amount),
+            balanceAfter: parseFloat(data.balance_after), isDebit: data.is_debit, sourceId: data.source_id
+        });
+        renderLedgerList();
+        updateLedgerDropdowns();
+    }
+
+    async function restoreToLedger(ledgerName, amount, caption, type, sourceId) {
+        const ledger = ledgers.find(l => l.name === ledgerName);
+        if (!ledger) return;
+        ledger.balance += amount;
+        const today = new Date();
+        const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        const histEntry = {
+            user_id: currentUser.id, ledger_name: ledgerName, txn_date: dateStr,
+            caption, txn_type: type, amount, balance_after: ledger.balance,
+            is_debit: false, source_id: sourceId
+        };
+        const { data, error } = await sb.from('ledger_history').insert(histEntry).select().single();
+        if (error) { console.error(error); alert('DB error: ' + error.message); return; }
+        await sb.from('ledgers').update({ balance: ledger.balance }).eq('id', ledger.id);
+        ledgerHistory.unshift({
+            id: data.id, date: data.txn_date, ledgerName: data.ledger_name,
+            caption: data.caption, type: data.txn_type, amount: parseFloat(data.amount),
+            balanceAfter: parseFloat(data.balance_after), isDebit: data.is_debit, sourceId: data.source_id
+        });
+        renderLedgerList();
+        updateLedgerDropdowns();
+    }
+
+    /* ============ SUBMIT HANDLERS ============ */
+    submitExpenseBtn.addEventListener('click', async () => {
+        const caption = expenseCaptionInput.value.trim() || 'Unnamed Expense';
+        const ledgerName = expenseLedgerSelect.value;
+        const amount = parseFloat(expenseAmountInput.value) || 0;
+        const type = expenseTypeSelect.value;
+
+        if (!ledgerName) { alert('Please select a ledger.'); return; }
+        const ledger = ledgers.find(l => l.name === ledgerName);
+        if (!ledger) { alert('Ledger not found.'); return; }
+        if (ledger.balance <= 0) { alert(`Ledger "${ledgerName}" has zero balance.`); return; }
+        if (amount <= 0) { alert('Please enter a valid amount.'); return; }
+        if (amount > ledger.balance) { alert(`Amount exceeds available balance of ${ledger.balance.toFixed(2)}.`); return; }
+
+        const sourceId = 'exp-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
+        const { error } = await sb.from('expenses').insert({
+            user_id: currentUser.id, caption, ledger_name: ledgerName,
+            amount, expense_type: type, source_id: sourceId
+        });
+        if (error) { alert('DB error: ' + error.message); return; }
+
+        await deductFromLedger(ledgerName, amount, caption, type, sourceId);
+        addExpenseRow(caption, ledgerName, amount, type, sourceId);
+        totalExpenseAmount += amount;
+        updateExpenseDisplays();
+        calculateTotals();
+        applySearchFilter();
+        expenseCaptionInput.value = ''; expenseAmountInput.value = '';
+        closeModal(expenseModal);
+    });
+
+    submitBankExpenseBtn.addEventListener('click', async () => {
+        const caption = bankExpenseCaptionInput.value.trim() || 'Unnamed Bank Expense';
+        const ledgerName = bankExpenseLedgerSelect.value;
+        const amount = parseFloat(bankExpenseAmountInput.value) || 0;
+
+        if (!ledgerName) { alert('Please select a ledger.'); return; }
+        const ledger = ledgers.find(l => l.name === ledgerName);
+        if (!ledger) { alert('Ledger not found.'); return; }
+        if (ledger.balance <= 0) { alert(`Ledger "${ledgerName}" has zero balance.`); return; }
+        if (amount <= 0) { alert('Please enter a valid amount.'); return; }
+        if (amount > ledger.balance) { alert(`Amount exceeds available balance of ${ledger.balance.toFixed(2)}.`); return; }
+
+        const sourceId = 'bnk-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
+        const { error } = await sb.from('bank_expenses').insert({
+            user_id: currentUser.id, caption, ledger_name: ledgerName, amount, source_id: sourceId
+        });
+        if (error) { alert('DB error: ' + error.message); return; }
+
+        await deductFromLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
+        addBankExpenseRow(caption, ledgerName, amount, sourceId);
+        smartPayExpenseAmount += amount;
+        updateSmartPayExpenseDisplay();
+        calculateTotals();
+        applySearchFilter();
+        bankExpenseCaptionInput.value = ''; bankExpenseAmountInput.value = '';
+        closeModal(bankExpenseModal);
+    });
+
+    submitSmartPayIncomeBtn.addEventListener('click', async () => {
+        const invoice = smartPayInvoiceInput.value.trim() || 'Unnamed Invoice';
+        const amount = parseFloat(smartPayIncomeAmountInput.value) || 0;
+        if (amount <= 0) { alert('Please enter a valid amount.'); return; }
+
+        const { error } = await sb.from('smartpay_income').insert({
+            user_id: currentUser.id, invoice, amount
+        });
+        if (error) { alert('DB error: ' + error.message); return; }
+
+        addIncomeRow(invoice, amount);
+        smartPayIncomeAmount += amount;
+        updateSmartPayIncomeDisplay();
+        calculateTotals();
+        applySearchFilter();
+        smartPayInvoiceInput.value = ''; smartPayIncomeAmountInput.value = '';
+        closeModal(smartPayIncomeModal);
+    });
+
+    submitLedgerBtn.addEventListener('click', async () => {
+        const name = ledgerNameInput.value.trim();
+        const balance = parseFloat(ledgerOpeningBalanceInput.value) || 0;
+        if (!name) { alert('Please enter a ledger name.'); return; }
+        if (balance < 0) { alert('Opening balance cannot be negative.'); return; }
+        if (ledgers.some(l => l.name === name)) { alert('Ledger already exists.'); return; }
+
+        const { data, error } = await sb.from('ledgers').insert({
+            user_id: currentUser.id, name, balance
+        }).select().single();
+        if (error) { alert('DB error: ' + error.message); return; }
+
+        ledgers.push({ id: data.id, name, balance });
+
+        const today = new Date();
+        const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        const { data: hd } = await sb.from('ledger_history').insert({
+            user_id: currentUser.id, ledger_name: name, txn_date: dateStr,
+            caption: 'Opening Balance', txn_type: 'Opening', amount: balance,
+            balance_after: balance, is_debit: false, source_id: null
+        }).select().single();
+        if (hd) {
+            ledgerHistory.unshift({
+                id: hd.id, date: hd.txn_date, ledgerName: hd.ledger_name,
+                caption: hd.caption, type: hd.txn_type, amount: parseFloat(hd.amount),
+                balanceAfter: parseFloat(hd.balance_after), isDebit: hd.is_debit, sourceId: hd.source_id
+            });
+        }
+
+        renderLedgerList();
+        updateLedgerDropdowns();
+        populateHistoryFilter();
+        ledgerNameInput.value = ''; ledgerOpeningBalanceInput.value = '';
+        ledgerNameInput.focus();
+    });
+
+    submitNewTransactionBtn.addEventListener('click', async () => {
+        const ledgerName = txnLedgerSelect.value;
+        const date = txnDateInput.value;
+        const particular = txnParticularInput.value.trim() || 'Transaction';
+        const type = txnTypeSelect.value;
+        const amount = parseFloat(txnAmountInput.value) || 0;
+
+        if (!ledgerName) { alert('Please select a ledger.'); return; }
+        if (!date) { alert('Please select a date.'); return; }
+        if (amount <= 0) { alert('Please enter a valid amount.'); return; }
+
+        const ledger = ledgers.find(l => l.name === ledgerName);
+        if (!ledger) { alert('Ledger not found.'); return; }
+        if (type === 'Debit' && amount > ledger.balance) { alert(`Debit exceeds balance ${ledger.balance.toFixed(2)}.`); return; }
+
+        if (type === 'Credit') ledger.balance += amount;
+        else ledger.balance -= amount;
+
+        const { data, error } = await sb.from('ledger_history').insert({
+            user_id: currentUser.id, ledger_name: ledgerName, txn_date: date,
+            caption: particular, txn_type: type, amount, balance_after: ledger.balance,
+            is_debit: type === 'Debit', source_id: null
+        }).select().single();
+        if (error) { alert('DB error: ' + error.message); return; }
+        await sb.from('ledgers').update({ balance: ledger.balance }).eq('id', ledger.id);
+
+        ledgerHistory.unshift({
+            id: data.id, date: data.txn_date, ledgerName: data.ledger_name,
+            caption: data.caption, type: data.txn_type, amount: parseFloat(data.amount),
+            balanceAfter: parseFloat(data.balance_after), isDebit: data.is_debit, sourceId: data.source_id
+        });
+
+        renderLedgerList();
+        updateLedgerDropdowns();
+        populateHistoryFilter();
+        renderHistoryTable();
+        txnParticularInput.value = ''; txnAmountInput.value = '';
+        closeModal(newTransactionModal);
+    });
+
+    /* ============ DELETE HANDLERS ============ */
+    expenseTableBody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.btn-delete-row'); if (!btn) return;
+        const row = btn.closest('tr');
+        const amount = parseFloat(row.dataset.amount) || 0;
+        const ledgerName = row.dataset.ledgerName;
+        const caption = row.dataset.caption || 'Deleted Expense';
+        const type = row.dataset.type || 'General';
+        const sourceId = row.dataset.sourceId;
+
+        if (sourceId) {
+            await sb.from('expenses').delete().eq('source_id', sourceId);
+            await sb.from('ledger_history').delete().eq('source_id', sourceId);
+        }
+        if (ledgerName) await restoreToLedger(ledgerName, amount, caption, type, sourceId);
+
+        totalExpenseAmount -= amount;
+        updateExpenseDisplays();
+        row.remove();
+        if (expenseTableBody.children.length === 0) renderExpenseEmptyState();
+        calculateTotals();
+        applySearchFilter();
+        renderHistoryTable();
+    });
+
+    bankExpenseTableBody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.btn-delete-row'); if (!btn) return;
+        const row = btn.closest('tr');
+        const amount = parseFloat(row.dataset.amount) || 0;
+        const ledgerName = row.dataset.ledgerName;
+        const caption = row.dataset.caption || 'Deleted Bank Expense';
+        const sourceId = row.dataset.sourceId;
+
+        if (sourceId) {
+            await sb.from('bank_expenses').delete().eq('source_id', sourceId);
+            await sb.from('ledger_history').delete().eq('source_id', sourceId);
+        }
+        if (ledgerName) await restoreToLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
+
+        smartPayExpenseAmount -= amount;
+        updateSmartPayExpenseDisplay();
+        row.remove();
+        if (bankExpenseTableBody.children.length === 0) renderBankExpenseEmptyState();
+        calculateTotals();
+        applySearchFilter();
+        renderHistoryTable();
+    });
+
+    smartPayIncomeTableBody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.btn-delete-row'); if (!btn) return;
+        const row = btn.closest('tr');
+        const amount = parseFloat(row.dataset.amount) || 0;
+        const invoice = row.cells[0].textContent;
+
+        await sb.from('smartpay_income').delete().eq('invoice', invoice).eq('amount', amount);
+
+        smartPayIncomeAmount -= amount;
+        updateSmartPayIncomeDisplay();
+        row.remove();
+        if (smartPayIncomeTableBody.children.length === 0) renderSmartPayIncomeEmptyState();
+        calculateTotals();
+        applySearchFilter();
+    });
+
+    ledgerListContainer.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.btn-delete-row'); if (!btn) return;
+        const ledgerName = btn.dataset.ledgerName;
+        const ledgerId = btn.dataset.ledgerId;
+        if (!confirm(`Delete ledger "${ledgerName}"? This will remove all its history.`)) return;
+
+        await sb.from('ledgers').delete().eq('id', ledgerId);
+        await sb.from('ledger_history').delete().eq('ledger_name', ledgerName);
+
+        ledgers = ledgers.filter(l => l.id !== ledgerId);
+        ledgerHistory = ledgerHistory.filter(h => h.ledgerName !== ledgerName);
+
+        renderLedgerList();
+        updateLedgerDropdowns();
+        populateHistoryFilter();
+        renderHistoryTable();
+    });
+
+    historyTableBody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.btn-delete-row'); if (!btn) return;
+        const id = btn.dataset.historyId;
+        const record = ledgerHistory.find(h => String(h.id) === String(id));
+        if (!record) return;
+        if (!confirm(`Delete history entry? "${record.caption}" - ${record.amount.toFixed(2)}`)) return;
+
+        const ledger = ledgers.find(l => l.name === record.ledgerName);
+        if (ledger) {
+            if (record.isDebit) ledger.balance += record.amount;
+            else ledger.balance -= record.amount;
+            await sb.from('ledgers').update({ balance: ledger.balance }).eq('id', ledger.id);
+        }
+        await sb.from('ledger_history').delete().eq('id', id);
+
+        if (record.sourceId) {
+            await sb.from('expenses').delete().eq('source_id', record.sourceId);
+            await sb.from('bank_expenses').delete().eq('source_id', record.sourceId);
+            const allRows = document.querySelectorAll('#expenseTableBody tr, #bankExpenseTableBody tr');
+            allRows.forEach(row => {
+                if (row.dataset.sourceId === record.sourceId) {
+                    const amt = parseFloat(row.dataset.amount) || 0;
+                    if (row.closest('#expenseTableBody')) { totalExpenseAmount -= amt; updateExpenseDisplays(); }
+                    else if (row.closest('#bankExpenseTableBody')) { smartPayExpenseAmount -= amt; updateSmartPayExpenseDisplay(); }
+                    row.remove();
+                }
+            });
+            if (expenseTableBody.children.length === 0) renderExpenseEmptyState();
+            if (bankExpenseTableBody.children.length === 0) renderBankExpenseEmptyState();
+        }
+
+        ledgerHistory = ledgerHistory.filter(h => String(h.id) !== String(id));
+        renderLedgerList();
+        updateLedgerDropdowns();
+        populateHistoryFilter();
+        renderHistoryTable();
+        calculateTotals();
+        applySearchFilter();
+    });
+
+    /* ============ DISPLAYS / CALC ============ */
+    function updateExpenseDisplays() {
+        headerTotalExpensesEl.textContent = (totalExpenseAmount - smartPayExpenseAmount).toFixed(2);
+        leftTotalExpenseDisplayEl.textContent = totalExpenseAmount.toFixed(2);
+    }
+    function updateSmartPayExpenseDisplay() { smartPayExpenseDisplayEl.textContent = smartPayExpenseAmount.toFixed(2); }
+    function updateSmartPayIncomeDisplay() {
+        smartPayIncomeDisplayEl.textContent = smartPayIncomeAmount.toFixed(2);
+        smartPayBalanceDisplayEl.textContent = (smartPayIncomeAmount - smartPayExpenseAmount).toFixed(2);
+    }
+
+    function calculateTotals() {
+        let grandTotal = 0;
+        denomInputs.forEach(input => {
+            const cv = parseFloat(input.getAttribute('data-currency')) || 0;
+            const count = parseFloat(input.value) || 0;
+            const total = cv * count;
+            input.closest('tr').querySelector('.row-total').textContent = total.toFixed(2);
+            grandTotal += total;
+        });
+        denomGrandTotalEl.textContent = grandTotal.toFixed(2);
+        totalCashInput.value = grandTotal.toFixed(2);
+
+        const opening = parseFloat(openingInput.value) || 0;
+        const others = parseFloat(othersInput.value) || 0;
+        totalBillInput.value = (opening + others).toFixed(2);
+
+        const combined = totalExpenseAmount + smartPayExpenseAmount;
+        const result = (opening + others) - combined - grandTotal + smartPayIncomeAmount;
+        if (Math.abs(result) < 0.001) {
+            shiftCashResultEl.textContent = 'Tally';
+            shiftCashResultEl.classList.add('tally');
+        } else {
+            shiftCashResultEl.textContent = result.toFixed(2);
+            shiftCashResultEl.classList.remove('tally');
+        }
+        expenceInput.value = totalExpenseAmount.toFixed(2);
+    }
+
+    denomInputs.forEach(i => { i.addEventListener('input', calculateTotals); i.addEventListener('change', calculateTotals); });
+    openingInput.addEventListener('input', calculateTotals);
+    othersInput.addEventListener('input', calculateTotals);
+
+    clearOpeningBtn.addEventListener('click', () => {
+        openingInput.value = ''; othersInput.value = '';
+        calculateTotals(); openingInput.focus();
+    });
+    openingInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); othersInput.focus(); othersInput.select(); }
+    });
+    othersInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); const f = document.querySelector('.denom-input'); if (f) { f.focus(); f.select(); } }
+    });
+    denomInputs.forEach((input, idx) => {
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const next = denomInputs[(idx+1) % denomInputs.length];
+                next.focus(); next.select();
+            }
+        });
+    });
+    refreshBtn.addEventListener('click', () => {
+        denomInputs.forEach(i => i.value = '');
+        denomGrandTotalEl.textContent = '0.00';
+        totalCashInput.value = '0.00';
+        document.querySelectorAll('.row-total').forEach(el => el.textContent = '0.00');
+        calculateTotals();
+    });
+
+    /* ============ SAVE CHANGES ============ */
+    saveChangesBtn.addEventListener('click', async () => {
+        if (!currentUser) { alert('Not logged in.'); return; }
+        try {
+            // Save opening, others, and denomination counts to localStorage as "working state"
+            const state = {
+                opening: openingInput.value,
+                others: othersInput.value,
+                denominations: Array.from(denomInputs).map(i => i.value),
+                savedAt: new Date().toISOString()
+            };
+            localStorage.setItem('blueLightWorkingState_' + currentUser.id, JSON.stringify(state));
+
+            // Refresh all totals so UI reflects current state
+            calculateTotals();
+
+            // Show confirmation briefly
+            const originalText = saveChangesBtn.textContent;
+            saveChangesBtn.textContent = '✓ Saved!';
+            saveChangesBtn.style.backgroundColor = 'var(--accent-green)';
+            saveChangesBtn.style.borderColor = 'var(--accent-green)';
+            setTimeout(() => {
+                saveChangesBtn.textContent = originalText;
+                saveChangesBtn.style.backgroundColor = '';
+                saveChangesBtn.style.borderColor = '';
+            }, 1500);
+        } catch (err) {
+            alert('Error saving: ' + err.message);
         }
     });
+
+    // Load working state (opening, others, denominations) for this user
+    function loadWorkingState() {
+        if (!currentUser) return;
+        try {
+            const raw = localStorage.getItem('blueLightWorkingState_' + currentUser.id);
+            if (!raw) return;
+            const state = JSON.parse(raw);
+            if (state.opening) openingInput.value = state.opening;
+            if (state.others) othersInput.value = state.others;
+            if (Array.isArray(state.denominations)) {
+                denomInputs.forEach((input, i) => {
+                    if (state.denominations[i] !== undefined) input.value = state.denominations[i];
+                });
+            }
+            calculateTotals();
+        } catch (e) { /* ignore */ }
+    }
+
+    /* ============ SEARCH ============ */
+    function applySearchFilter() {
+        searchTerm = searchInput.value.trim().toLowerCase();
+        [expenseTableBody, bankExpenseTableBody, smartPayIncomeTableBody].forEach(tbody => {
+            tbody.querySelectorAll('tr').forEach(row => {
+                if (row.classList.contains('empty-row')) return;
+                const text = row.textContent.toLowerCase();
+                row.style.display = (searchTerm === '' || text.includes(searchTerm)) ? '' : 'none';
+            });
+        });
+    }
+    searchInput.addEventListener('input', applySearchFilter);
+
+    /* ============ CALCULATOR ============ */
+    let calcCurrentValue = '0', calcPreviousValue = null, calcOperation = null, calcShouldReset = false;
+    function updateCalcDisplay() { calcDisplay.textContent = calcCurrentValue; }
+    function calcInputNumber(n) {
+        if (calcShouldReset) { calcCurrentValue = n; calcShouldReset = false; }
+        else calcCurrentValue = (calcCurrentValue === '0') ? n : calcCurrentValue + n;
+        updateCalcDisplay();
+    }
+    function calcInputDecimal() {
+        if (calcShouldReset) { calcCurrentValue = '0.'; calcShouldReset = false; }
+        else if (!calcCurrentValue.includes('.')) calcCurrentValue += '.';
+        updateCalcDisplay();
+    }
+    function calcClear() { calcCurrentValue = '0'; calcPreviousValue = null; calcOperation = null; calcShouldReset = false; updateCalcDisplay(); }
+    function calcBackspace() {
+        calcCurrentValue = calcCurrentValue.length <= 1 ? '0' : calcCurrentValue.slice(0,-1);
+        updateCalcDisplay();
+    }
+    function calcPercent() { calcCurrentValue = String((parseFloat(calcCurrentValue)||0)/100); updateCalcDisplay(); }
+    function performCalc(p, c, op) {
+        switch(op) {
+            case 'add': return p + c;
+            case 'subtract': return p - c;
+            case 'multiply': return p * c;
+            case 'divide': return c !== 0 ? p / c : 0;
+        }
+        return c;
+    }
+    function calcOperationHandler(op) {
+        const cur = parseFloat(calcCurrentValue);
+        if (calcPreviousValue !== null && calcOperation && !calcShouldReset) {
+            const r = performCalc(calcPreviousValue, cur, calcOperation);
+            calcCurrentValue = String(r); updateCalcDisplay(); calcPreviousValue = r;
+        } else calcPreviousValue = cur;
+        calcOperation = op; calcShouldReset = true;
+    }
+    function calcEquals() {
+        const cur = parseFloat(calcCurrentValue);
+        if (calcPreviousValue !== null && calcOperation) {
+            calcCurrentValue = String(performCalc(calcPreviousValue, cur, calcOperation));
+            calcPreviousValue = null; calcOperation = null; calcShouldReset = true;
+            updateCalcDisplay();
+        }
+    }
+    document.querySelectorAll('.calc-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const a = this.dataset.action;
+            if (a === 'num') calcInputNumber(this.dataset.value);
+            else if (a === 'decimal') calcInputDecimal();
+            else if (a === 'clear') calcClear();
+            else if (a === 'backspace') calcBackspace();
+            else if (a === 'percent') calcPercent();
+            else if (['add','subtract','multiply','divide'].includes(a)) calcOperationHandler(a);
+            else if (a === 'equals') calcEquals();
+        });
+    });
+    calculatorBtn.addEventListener('click', () => calculatorWindow.classList.add('active'));
+    closeCalculatorBtn.addEventListener('click', () => calculatorWindow.classList.remove('active'));
+
+    let isDragging = false, dragOffsetX = 0, dragOffsetY = 0;
+    calcTitlebar.addEventListener('mousedown', e => {
+        if (e.target.closest('.calc-titlebar-btn')) return;
+        isDragging = true;
+        const r = calculatorWindow.getBoundingClientRect();
+        dragOffsetX = e.clientX - r.left; dragOffsetY = e.clientY - r.top;
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+        if (!isDragging) return;
+        calculatorWindow.style.left = (e.clientX - dragOffsetX) + 'px';
+        calculatorWindow.style.top = (e.clientY - dragOffsetY) + 'px';
+    });
+    document.addEventListener('mouseup', () => isDragging = false);
+
+    updateCalcDisplay();
+    calculateTotals();
+
+    // Auto-save working state whenever opening / others / denominations change
+    openingInput.addEventListener('change', () => {
+        if (currentUser) {
+            const st = { opening: openingInput.value, others: othersInput.value,
+                denominations: Array.from(denomInputs).map(i => i.value) };
+            localStorage.setItem('blueLightWorkingState_' + currentUser.id, JSON.stringify(st));
+        }
+    });
+    othersInput.addEventListener('change', () => {
+        if (currentUser) {
+            const st = { opening: openingInput.value, others: othersInput.value,
+                denominations: Array.from(denomInputs).map(i => i.value) };
+            localStorage.setItem('blueLightWorkingState_' + currentUser.id, JSON.stringify(st));
+        }
+    });
+    denomInputs.forEach(i => i.addEventListener('change', () => {
+        if (currentUser) {
+            const st = { opening: openingInput.value, others: othersInput.value,
+                denominations: Array.from(denomInputs).map(x => x.value) };
+            localStorage.setItem('blueLightWorkingState_' + currentUser.id, JSON.stringify(st));
+        }
+    }));
+
+    // Hook into showApp to load working state after login
+    const originalShowApp = showApp;
+    showApp = function(user) {
+        originalShowApp(user);
+        setTimeout(loadWorkingState, 500);
+    };
+
+    // Placeholder empty states
+    renderExpenseEmptyState();
+    renderBankExpenseEmptyState();
+    renderSmartPayIncomeEmptyState();
+    renderLedgerEmptyState();
+});
 </script>
 
 </body>
