@@ -168,6 +168,7 @@
             box-shadow: 0 0 0 2px rgba(250,204,21,0.2);
         }
         .date-input::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; opacity: .8; }
+
         .day-text { font-size: 18px; font-weight: 400; color: #cbd5e1; padding-left: 8px; }
         .header-center { text-align: center; font-size: 14px; line-height: 1.6; color: #94a3b8; }
         .header-center .text-red { color: var(--accent-red); font-weight: 600; }
@@ -242,6 +243,13 @@
             transition: all .2s;
         }
         .btn-delete-row:hover { background-color: #fee2e2; color: var(--accent-red); }
+        .btn-edit-row {
+            background: none; border: none; color: var(--text-muted);
+            cursor: pointer; display: flex; align-items: center;
+            justify-content: center; padding: 4px; border-radius: 4px;
+            transition: all .2s;
+        }
+        .btn-edit-row:hover { background-color: #dbeafe; color: #3b82f6; }
         .empty-row td {
             text-align: center; color: var(--text-muted);
             font-style: italic; padding: 20px;
@@ -467,7 +475,8 @@
         }
         .ledger-table tr:last-child td { border-bottom: none; }
         .ledger-table .no-col { width: 40px; color: var(--text-muted); font-weight: 600; }
-        .ledger-table .action-col { width: 40px; text-align: center; }
+        .ledger-table .action-col { width: 80px; text-align: center; }
+        .ledger-table .action-col button { display: inline-flex; margin: 0 2px; }
 
         .history-table-container {
             margin-top: 10px; border: 1px solid var(--border-color);
@@ -547,6 +556,23 @@
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
         .hidden { display: none !important; }
+
+        /* Toast */
+        .toast {
+            position: fixed; bottom: 30px; left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background-color: var(--primary-dark); color: white;
+            padding: 12px 24px; border-radius: 8px;
+            font-size: 14px; font-weight: 500;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            z-index: 9999; opacity: 0;
+            transition: all .3s ease;
+        }
+        .toast.show {
+            opacity: 1; transform: translateX(-50%) translateY(0);
+        }
+        .toast.success { background-color: var(--accent-green); }
+        .toast.error { background-color: var(--accent-red); }
     </style>
 </head>
 <body>
@@ -848,6 +874,21 @@
     </div>
 </div>
 
+<!-- EDIT LEDGER MODAL -->
+<div class="modal-overlay" id="editLedgerModal">
+    <div class="modal-content">
+        <div class="modal-header"><h3>Edit Ledger</h3><button class="modal-close" id="closeEditLedgerModal">&times;</button></div>
+        <div class="modal-body">
+            <div class="modal-form-group"><label for="editLedgerName">Ledger Name</label><input type="text" id="editLedgerName" placeholder="Ledger Name"></div>
+            <div class="modal-form-group"><label for="editLedgerBalance">Balance</label><input type="number" id="editLedgerBalance" placeholder="0.00"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-cancel" id="cancelEditLedger">Cancel</button>
+            <button class="modal-btn modal-btn-submit" id="submitEditLedger">Save Changes</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal-overlay" id="ledgerHistoryModal">
     <div class="modal-content" style="width: 800px;">
         <div class="modal-header">
@@ -873,9 +914,9 @@
                         <tr>
                             <th style="width: 100px;">Date</th>
                             <th>Particular</th>
-                            <th style="width: 90px; text-align: right;">Debit</th>
-                            <th style="width: 90px; text-align: right;">Credit</th>
-                            <th style="width: 100px; text-align: right;">Balance</th>
+                            <th style="width: 110px; text-align: right;">Debit</th>
+                            <th style="width: 110px; text-align: right;">Credit</th>
+                            <th style="width: 120px; text-align: right;">Balance</th>
                             <th class="action-col">Action</th>
                         </tr>
                     </thead>
@@ -942,6 +983,9 @@
     </div>
 </div>
 
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
 <script>
 /* ============================================================
    SUPABASE SETUP
@@ -950,7 +994,26 @@ const SUPABASE_URL = 'https://vntdzgzefdtxxrmvipet.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_HQSVM5sV3xvQjGbbgBRA7Q_AhJD_6yC';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+/* ============================================================
+   CURRENCY FORMAT HELPER
+   ============================================================ */
+function fmtCurrency(value) {
+    const n = parseFloat(value) || 0;
+    return n.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+
+    /* ============ TOAST ============ */
+    function showToast(msg, type) {
+        const toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.className = 'toast show' + (type ? ' ' + type : '');
+        setTimeout(() => toast.classList.remove('show'), 2500);
+    }
 
     /* ============ AUTH UI ============ */
     const authScreen = document.getElementById('authScreen');
@@ -1016,8 +1079,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const email = document.getElementById('signupEmail').value.trim();
         const password = document.getElementById('signupPassword').value;
         const { data, error } = await sb.auth.signUp({
-            email, password,
-            options: { data: { username } }
+            email, password, options: { data: { username } }
         });
         signupBtn.disabled = false;
         if (error) { signupMsg.textContent = error.message; return; }
@@ -1043,7 +1105,6 @@ document.addEventListener('DOMContentLoaded', function() {
             showAuthScreen();
             ledgers = []; ledgerHistory = [];
             totalExpenseAmount = 0; smartPayExpenseAmount = 0; smartPayIncomeAmount = 0;
-            historyIdCounter = 1;
             dataLoaded = false;
         }
     });
@@ -1118,6 +1179,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const ledgerOpeningBalanceInput = document.getElementById('ledgerOpeningBalance');
     const ledgerListContainer = document.getElementById('ledgerList');
 
+    // Edit Ledger modal elements
+    const editLedgerModal = document.getElementById('editLedgerModal');
+    const closeEditLedgerModalBtn = document.getElementById('closeEditLedgerModal');
+    const cancelEditLedgerBtn = document.getElementById('cancelEditLedger');
+    const submitEditLedgerBtn = document.getElementById('submitEditLedger');
+    const editLedgerNameInput = document.getElementById('editLedgerName');
+    const editLedgerBalanceInput = document.getElementById('editLedgerBalance');
+    let editingLedgerId = null;
+
     const ledgerHistoryModal = document.getElementById('ledgerHistoryModal');
     const openLedgerHistoryModalBtn = document.getElementById('openLedgerHistoryModal');
     const closeLedgerHistoryModalBtn = document.getElementById('closeLedgerHistoryModal');
@@ -1150,6 +1220,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let historyIdCounter = 1;
     let dataLoaded = false;
 
+    const SMART_PAY_LEDGER_NAME = 'Smart Pay Ledger';
+
     /* ============ LIVE CLOCK ============ */
     function updateClock() {
         const now = new Date();
@@ -1179,12 +1251,95 @@ document.addEventListener('DOMContentLoaded', function() {
         const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
         dayDisplay.textContent = days[d.getUTCDay()];
     }
-    datePicker.addEventListener('change', updateDateDisplay);
+    datePicker.addEventListener('change', async () => {
+        updateDateDisplay();
+        if (currentUser) {
+            connStatusEl.textContent = '● Loading…';
+            await loadDailyData();
+            connStatusEl.textContent = '● Online';
+            showToast('Loaded data for ' + datePicker.value, 'success');
+        }
+    });
     setInitialDate();
 
     /* ============================================================
-       SUPABASE DATA LOADING
+       DAILY DATA: SAVE & LOAD FROM DATABASE
        ============================================================ */
+    const DAILY_TABLE = 'daily_records';
+
+    async function saveDailyData() {
+        if (!currentUser) return false;
+        const dateVal = datePicker.value;
+        if (!dateVal) return false;
+
+        const record = {
+            user_id: currentUser.id,
+            record_date: dateVal,
+            opening: parseFloat(openingInput.value) || 0,
+            others: parseFloat(othersInput.value) || 0,
+            denominations: Array.from(denomInputs).map(i => parseFloat(i.value) || 0)
+        };
+
+        const { error } = await sb.from(DAILY_TABLE).upsert(record, {
+            onConflict: 'user_id,record_date'
+        });
+        if (error) { console.error(error); return false; }
+        return true;
+    }
+
+    async function loadDailyData() {
+        if (!currentUser) return false;
+        const dateVal = datePicker.value;
+        if (!dateVal) return false;
+
+        const { data, error } = await sb.from(DAILY_TABLE)
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .eq('record_date', dateVal)
+            .maybeSingle();
+
+        if (error) { console.error(error); return false; }
+
+        if (!data) {
+            openingInput.value = '';
+            othersInput.value = '';
+            denomInputs.forEach(i => i.value = '');
+            calculateTotals();
+            return false;
+        }
+
+        openingInput.value = data.opening || '';
+        othersInput.value = data.others || '';
+        const denoms = data.denominations || [];
+        denomInputs.forEach((input, i) => {
+            input.value = denoms[i] || '';
+        });
+        calculateTotals();
+        return true;
+    }
+
+    /* ============================================================
+       SUPABASE DATA LOADING (Ledgers, Expenses, Income)
+       ============================================================ */
+    async function ensureSmartPayLedger() {
+        let existing = ledgers.find(l => l.name === SMART_PAY_LEDGER_NAME);
+        if (existing) return existing;
+
+        const { data, error } = await sb.from('ledgers').insert({
+            user_id: currentUser.id,
+            name: SMART_PAY_LEDGER_NAME,
+            balance: 0
+        }).select().single();
+
+        if (error) {
+            console.error('Failed to create Smart Pay Ledger:', error);
+            return null;
+        }
+        const newLedger = { id: data.id, name: data.name, balance: 0 };
+        ledgers.push(newLedger);
+        return newLedger;
+    }
+
     async function loadAllData() {
         if (!currentUser || dataLoaded) return;
         dataLoaded = true;
@@ -1195,6 +1350,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const { data: ledgersData, error: e1 } = await sb.from('ledgers').select('*').order('created_at');
             if (e1) throw e1;
             ledgers = (ledgersData || []).map(r => ({ id: r.id, name: r.name, balance: parseFloat(r.balance) || 0 }));
+
+            await ensureSmartPayLedger();
 
             const { data: histData, error: e2 } = await sb.from('ledger_history').select('*').order('created_at', { ascending: false });
             if (e2) throw e2;
@@ -1230,7 +1387,7 @@ document.addEventListener('DOMContentLoaded', function() {
             smartPayIncomeAmount = 0;
             smartPayIncomeTableBody.innerHTML = '';
             (incomeData || []).forEach(r => {
-                addIncomeRow(r.invoice, parseFloat(r.amount)||0);
+                addIncomeRow(r.invoice, parseFloat(r.amount)||0, r.id);
                 smartPayIncomeAmount += parseFloat(r.amount) || 0;
             });
             if ((incomeData||[]).length === 0) renderSmartPayIncomeEmptyState();
@@ -1244,13 +1401,15 @@ document.addEventListener('DOMContentLoaded', function() {
             calculateTotals();
             applySearchFilter();
 
+            await loadDailyData();
+
             connStatusEl.textContent = '● Online';
             connStatusEl.classList.add('online');
         } catch (err) {
             console.error('Load error:', err);
             connStatusEl.textContent = '● Sync error';
             connStatusEl.classList.add('offline');
-            alert('Error loading data: ' + err.message);
+            showToast('Error loading data: ' + err.message, 'error');
         }
     }
 
@@ -1275,7 +1434,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (emptyRow) emptyRow.remove();
         const newRow = document.createElement('tr');
         newRow.innerHTML = `
-            <td>${caption}</td><td>${ledgerName}</td><td>${amount.toFixed(2)}</td><td>${type}</td>
+            <td>${caption}</td><td>${ledgerName}</td><td>${fmtCurrency(amount)}</td><td>${type}</td>
             <td style="text-align: center;">
                 <button class="btn-delete-row" title="Delete Expense">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
@@ -1294,7 +1453,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (emptyRow) emptyRow.remove();
         const newRow = document.createElement('tr');
         newRow.innerHTML = `
-            <td>${caption}</td><td>${ledgerName}</td><td>${amount.toFixed(2)}</td>
+            <td>${caption}</td><td>${ledgerName}</td><td>${fmtCurrency(amount)}</td>
             <td style="text-align: center;">
                 <button class="btn-delete-row" title="Delete Expense">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
@@ -1307,18 +1466,19 @@ document.addEventListener('DOMContentLoaded', function() {
         bankExpenseTableBody.appendChild(newRow);
     }
 
-    function addIncomeRow(invoice, amount) {
+    function addIncomeRow(invoice, amount, sourceId) {
         const emptyRow = smartPayIncomeTableBody.querySelector('.empty-row');
         if (emptyRow) emptyRow.remove();
         const newRow = document.createElement('tr');
         newRow.innerHTML = `
-            <td>${invoice}</td><td>${amount.toFixed(2)}</td>
+            <td>${invoice}</td><td>${fmtCurrency(amount)}</td>
             <td style="text-align: center;">
                 <button class="btn-delete-row" title="Delete Income">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                 </button>
             </td>`;
         newRow.dataset.amount = amount;
+        newRow.dataset.sourceId = sourceId || '';
         smartPayIncomeTableBody.appendChild(newRow);
     }
 
@@ -1358,6 +1518,17 @@ document.addEventListener('DOMContentLoaded', function() {
     cancelLedgerBtn.addEventListener('click', () => closeModal(ledgerModal));
     ledgerModal.addEventListener('click', e => { if (e.target === ledgerModal) closeModal(ledgerModal); });
 
+    // Edit Ledger modal
+    closeEditLedgerModalBtn.addEventListener('click', () => closeModal(editLedgerModal));
+    cancelEditLedgerBtn.addEventListener('click', () => closeModal(editLedgerModal));
+    editLedgerModal.addEventListener('click', e => { if (e.target === editLedgerModal) closeModal(editLedgerModal); });
+    editLedgerNameInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); editLedgerBalanceInput.focus(); editLedgerBalanceInput.select(); }
+    });
+    editLedgerBalanceInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); submitEditLedgerBtn.click(); }
+    });
+
     openLedgerHistoryModalBtn.addEventListener('click', () => {
         openModal(ledgerHistoryModal);
         populateHistoryFilter(); renderHistoryTable();
@@ -1375,7 +1546,7 @@ document.addEventListener('DOMContentLoaded', function() {
             txnLedgerSelect.appendChild(o);
         } else {
             ledgers.forEach(l => {
-                const o = document.createElement('option'); o.value = l.name; o.textContent = `${l.name} (${l.balance.toFixed(2)})`;
+                const o = document.createElement('option'); o.value = l.name; o.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
                 txnLedgerSelect.appendChild(o);
             });
         }
@@ -1392,15 +1563,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateLedgerDropdowns() {
         expenseLedgerSelect.innerHTML = '';
         bankExpenseLedgerSelect.innerHTML = '';
-        const active = ledgers.filter(l => l.balance > 0);
-        if (active.length === 0) {
+        const availableLedgers = ledgers.filter(l => l.name !== SMART_PAY_LEDGER_NAME);
+        if (availableLedgers.length === 0) {
             const p = document.createElement('option');
-            p.value=''; p.textContent='-- No Ledgers with Balance --'; p.disabled=true; p.selected=true;
+            p.value=''; p.textContent='-- No Ledgers --'; p.disabled=true; p.selected=true;
             expenseLedgerSelect.appendChild(p);
             bankExpenseLedgerSelect.appendChild(p.cloneNode(true));
         } else {
-            active.forEach(l => {
-                const o1 = document.createElement('option'); o1.value = l.name; o1.textContent = `${l.name} (${l.balance.toFixed(2)})`;
+            availableLedgers.forEach(l => {
+                const o1 = document.createElement('option'); o1.value = l.name; o1.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
                 expenseLedgerSelect.appendChild(o1);
                 bankExpenseLedgerSelect.appendChild(o1.cloneNode(true));
             });
@@ -1427,15 +1598,15 @@ document.addEventListener('DOMContentLoaded', function() {
         historyTableBody.innerHTML = '';
         [...filtered].forEach(record => {
             const row = document.createElement('tr');
-            const debitDisplay = record.isDebit ? record.amount.toFixed(2) : '';
-            const creditDisplay = !record.isDebit ? record.amount.toFixed(2) : '';
+            const debitDisplay = record.isDebit ? fmtCurrency(record.amount) : '';
+            const creditDisplay = !record.isDebit ? fmtCurrency(record.amount) : '';
             row.dataset.historyId = record.id;
             row.innerHTML = `
                 <td>${record.date}</td>
                 <td>${record.caption} <span style="color: var(--text-muted); font-size: 12px;">(${record.ledgerName})</span></td>
                 <td style="text-align: right;" class="debit">${debitDisplay}</td>
                 <td style="text-align: right;" class="credit">${creditDisplay}</td>
-                <td style="text-align: right;" class="balance-col">${record.balanceAfter.toFixed(2)}</td>
+                <td style="text-align: right;" class="balance-col">${fmtCurrency(record.balanceAfter)}</td>
                 <td class="action-col">
                     <button class="btn-delete-row" title="Delete History Entry" data-history-id="${record.id}">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
@@ -1449,15 +1620,20 @@ document.addEventListener('DOMContentLoaded', function() {
         if (ledgers.length === 0) { renderLedgerEmptyState(); return; }
         ledgerListContainer.innerHTML = '';
         ledgers.forEach((l, i) => {
+            const isSmartPay = l.name === SMART_PAY_LEDGER_NAME;
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td class="no-col">${i+1}</td>
                 <td>${l.name}</td>
-                <td>${l.balance.toFixed(2)}</td>
+                <td>${fmtCurrency(l.balance)}</td>
                 <td class="action-col">
+                    <button class="btn-edit-row" title="Edit Ledger" data-edit-ledger-id="${l.id}" data-edit-ledger-name="${l.name}" data-edit-ledger-balance="${l.balance}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                    </button>
+                    ${isSmartPay ? '' : `
                     <button class="btn-delete-row" title="Delete Ledger" data-ledger-name="${l.name}" data-ledger-id="${l.id}">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                    </button>
+                    </button>`}
                 </td>`;
             ledgerListContainer.appendChild(row);
         });
@@ -1476,7 +1652,7 @@ document.addEventListener('DOMContentLoaded', function() {
             is_debit: true, source_id: sourceId
         };
         const { data, error } = await sb.from('ledger_history').insert(histEntry).select().single();
-        if (error) { console.error(error); alert('DB error: ' + error.message); return; }
+        if (error) { console.error(error); showToast('DB error: ' + error.message, 'error'); return; }
         await sb.from('ledgers').update({ balance: ledger.balance }).eq('id', ledger.id);
         ledgerHistory.unshift({
             id: data.id, date: data.txn_date, ledgerName: data.ledger_name,
@@ -1487,7 +1663,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateLedgerDropdowns();
     }
 
-    async function restoreToLedger(ledgerName, amount, caption, type, sourceId) {
+    async function creditToLedger(ledgerName, amount, caption, type, sourceId) {
         const ledger = ledgers.find(l => l.name === ledgerName);
         if (!ledger) return;
         ledger.balance += amount;
@@ -1499,7 +1675,7 @@ document.addEventListener('DOMContentLoaded', function() {
             is_debit: false, source_id: sourceId
         };
         const { data, error } = await sb.from('ledger_history').insert(histEntry).select().single();
-        if (error) { console.error(error); alert('DB error: ' + error.message); return; }
+        if (error) { console.error(error); showToast('DB error: ' + error.message, 'error'); return; }
         await sb.from('ledgers').update({ balance: ledger.balance }).eq('id', ledger.id);
         ledgerHistory.unshift({
             id: data.id, date: data.txn_date, ledgerName: data.ledger_name,
@@ -1517,19 +1693,19 @@ document.addEventListener('DOMContentLoaded', function() {
         const amount = parseFloat(expenseAmountInput.value) || 0;
         const type = expenseTypeSelect.value;
 
-        if (!ledgerName) { alert('Please select a ledger.'); return; }
+        if (!ledgerName) { showToast('Please select a ledger.', 'error'); return; }
         const ledger = ledgers.find(l => l.name === ledgerName);
-        if (!ledger) { alert('Ledger not found.'); return; }
-        if (ledger.balance <= 0) { alert(`Ledger "${ledgerName}" has zero balance.`); return; }
-        if (amount <= 0) { alert('Please enter a valid amount.'); return; }
-        if (amount > ledger.balance) { alert(`Amount exceeds available balance of ${ledger.balance.toFixed(2)}.`); return; }
+        if (!ledger) { showToast('Ledger not found.', 'error'); return; }
+        if (ledger.balance <= 0) { showToast(`Ledger "${ledgerName}" has zero balance.`, 'error'); return; }
+        if (amount <= 0) { showToast('Please enter a valid amount.', 'error'); return; }
+        if (amount > ledger.balance) { showToast(`Amount exceeds balance of ${fmtCurrency(ledger.balance)}.`, 'error'); return; }
 
         const sourceId = 'exp-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
         const { error } = await sb.from('expenses').insert({
             user_id: currentUser.id, caption, ledger_name: ledgerName,
             amount, expense_type: type, source_id: sourceId
         });
-        if (error) { alert('DB error: ' + error.message); return; }
+        if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
         await deductFromLedger(ledgerName, amount, caption, type, sourceId);
         addExpenseRow(caption, ledgerName, amount, type, sourceId);
@@ -1539,6 +1715,7 @@ document.addEventListener('DOMContentLoaded', function() {
         applySearchFilter();
         expenseCaptionInput.value = ''; expenseAmountInput.value = '';
         closeModal(expenseModal);
+        showToast('Expense added successfully', 'success');
     });
 
     submitBankExpenseBtn.addEventListener('click', async () => {
@@ -1546,18 +1723,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const ledgerName = bankExpenseLedgerSelect.value;
         const amount = parseFloat(bankExpenseAmountInput.value) || 0;
 
-        if (!ledgerName) { alert('Please select a ledger.'); return; }
+        if (!ledgerName) { showToast('Please select a ledger.', 'error'); return; }
         const ledger = ledgers.find(l => l.name === ledgerName);
-        if (!ledger) { alert('Ledger not found.'); return; }
-        if (ledger.balance <= 0) { alert(`Ledger "${ledgerName}" has zero balance.`); return; }
-        if (amount <= 0) { alert('Please enter a valid amount.'); return; }
-        if (amount > ledger.balance) { alert(`Amount exceeds available balance of ${ledger.balance.toFixed(2)}.`); return; }
+        if (!ledger) { showToast('Ledger not found.', 'error'); return; }
+        if (ledger.balance <= 0) { showToast(`Ledger "${ledgerName}" has zero balance.`, 'error'); return; }
+        if (amount <= 0) { showToast('Please enter a valid amount.', 'error'); return; }
+        if (amount > ledger.balance) { showToast(`Amount exceeds balance of ${fmtCurrency(ledger.balance)}.`, 'error'); return; }
 
         const sourceId = 'bnk-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
         const { error } = await sb.from('bank_expenses').insert({
             user_id: currentUser.id, caption, ledger_name: ledgerName, amount, source_id: sourceId
         });
-        if (error) { alert('DB error: ' + error.message); return; }
+        if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
         await deductFromLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
         addBankExpenseRow(caption, ledgerName, amount, sourceId);
@@ -1567,38 +1744,47 @@ document.addEventListener('DOMContentLoaded', function() {
         applySearchFilter();
         bankExpenseCaptionInput.value = ''; bankExpenseAmountInput.value = '';
         closeModal(bankExpenseModal);
+        showToast('Bank expense added', 'success');
     });
 
     submitSmartPayIncomeBtn.addEventListener('click', async () => {
         const invoice = smartPayInvoiceInput.value.trim() || 'Unnamed Invoice';
         const amount = parseFloat(smartPayIncomeAmountInput.value) || 0;
-        if (amount <= 0) { alert('Please enter a valid amount.'); return; }
+        if (amount <= 0) { showToast('Please enter a valid amount.', 'error'); return; }
+
+        const spLedger = await ensureSmartPayLedger();
+        if (!spLedger) { showToast('Failed to access Smart Pay Ledger', 'error'); return; }
+
+        const sourceId = 'inc-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
 
         const { error } = await sb.from('smartpay_income').insert({
             user_id: currentUser.id, invoice, amount
         });
-        if (error) { alert('DB error: ' + error.message); return; }
+        if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
-        addIncomeRow(invoice, amount);
+        await creditToLedger(SMART_PAY_LEDGER_NAME, amount, invoice, 'Smart Pay Income', sourceId);
+
+        addIncomeRow(invoice, amount, sourceId);
         smartPayIncomeAmount += amount;
         updateSmartPayIncomeDisplay();
         calculateTotals();
         applySearchFilter();
         smartPayInvoiceInput.value = ''; smartPayIncomeAmountInput.value = '';
         closeModal(smartPayIncomeModal);
+        showToast('Income added to Smart Pay Ledger', 'success');
     });
 
     submitLedgerBtn.addEventListener('click', async () => {
         const name = ledgerNameInput.value.trim();
         const balance = parseFloat(ledgerOpeningBalanceInput.value) || 0;
-        if (!name) { alert('Please enter a ledger name.'); return; }
-        if (balance < 0) { alert('Opening balance cannot be negative.'); return; }
-        if (ledgers.some(l => l.name === name)) { alert('Ledger already exists.'); return; }
+        if (!name) { showToast('Please enter a ledger name.', 'error'); return; }
+        if (balance < 0) { showToast('Opening balance cannot be negative.', 'error'); return; }
+        if (ledgers.some(l => l.name === name)) { showToast('Ledger already exists.', 'error'); return; }
 
         const { data, error } = await sb.from('ledgers').insert({
             user_id: currentUser.id, name, balance
         }).select().single();
-        if (error) { alert('DB error: ' + error.message); return; }
+        if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
         ledgers.push({ id: data.id, name, balance });
 
@@ -1622,6 +1808,90 @@ document.addEventListener('DOMContentLoaded', function() {
         populateHistoryFilter();
         ledgerNameInput.value = ''; ledgerOpeningBalanceInput.value = '';
         ledgerNameInput.focus();
+        showToast('Ledger created', 'success');
+    });
+
+    // EDIT LEDGER SUBMIT
+    submitEditLedgerBtn.addEventListener('click', async () => {
+        if (!editingLedgerId) { showToast('No ledger selected.', 'error'); return; }
+        const newName = editLedgerNameInput.value.trim();
+        const newBalance = parseFloat(editLedgerBalanceInput.value) || 0;
+
+        if (!newName) { showToast('Please enter a ledger name.', 'error'); return; }
+        if (newBalance < 0) { showToast('Balance cannot be negative.', 'error'); return; }
+
+        const ledger = ledgers.find(l => l.id === editingLedgerId);
+        if (!ledger) { showToast('Ledger not found.', 'error'); return; }
+
+        // Check for duplicate name (excluding itself)
+        if (ledgers.some(l => l.name === newName && l.id !== editingLedgerId)) {
+            showToast('Another ledger with this name already exists.', 'error');
+            return;
+        }
+
+        const oldName = ledger.name;
+        const oldBalance = ledger.balance;
+        const nameChanged = oldName !== newName;
+        const balanceChanged = Math.abs(oldBalance - newBalance) > 0.001;
+
+        // Prevent renaming Smart Pay Ledger
+        if (oldName === SMART_PAY_LEDGER_NAME && nameChanged) {
+            showToast('Smart Pay Ledger name cannot be changed.', 'error');
+            return;
+        }
+
+        // Update ledger in DB
+        const { error } = await sb.from('ledgers').update({
+            name: newName,
+            balance: newBalance
+        }).eq('id', editingLedgerId);
+        if (error) { showToast('DB error: ' + error.message, 'error'); return; }
+
+        // If name changed, update ledger_history records that reference the old name
+        if (nameChanged) {
+            await sb.from('ledger_history').update({ ledger_name: newName }).eq('ledger_name', oldName);
+            ledgerHistory.forEach(h => { if (h.ledgerName === oldName) h.ledgerName = newName; });
+        }
+
+        // If balance changed, add an adjustment entry to history so it stays consistent
+        if (balanceChanged) {
+            const diff = newBalance - oldBalance;
+            const isDebit = diff < 0;
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+            const { data: adj } = await sb.from('ledger_history').insert({
+                user_id: currentUser.id,
+                ledger_name: newName,
+                txn_date: dateStr,
+                caption: 'Manual Adjustment',
+                txn_type: 'Adjustment',
+                amount: Math.abs(diff),
+                balance_after: newBalance,
+                is_debit: isDebit,
+                source_id: null
+            }).select().single();
+            if (adj) {
+                ledgerHistory.unshift({
+                    id: adj.id, date: adj.txn_date, ledgerName: adj.ledger_name,
+                    caption: adj.caption, type: adj.txn_type, amount: parseFloat(adj.amount),
+                    balanceAfter: parseFloat(adj.balance_after), isDebit: adj.is_debit, sourceId: adj.source_id
+                });
+            }
+        }
+
+        // Update local state
+        ledger.name = newName;
+        ledger.balance = newBalance;
+
+        renderLedgerList();
+        updateLedgerDropdowns();
+        populateHistoryFilter();
+        renderHistoryTable();
+        calculateTotals();
+
+        editingLedgerId = null;
+        closeModal(editLedgerModal);
+        showToast('Ledger updated successfully', 'success');
     });
 
     submitNewTransactionBtn.addEventListener('click', async () => {
@@ -1631,13 +1901,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const type = txnTypeSelect.value;
         const amount = parseFloat(txnAmountInput.value) || 0;
 
-        if (!ledgerName) { alert('Please select a ledger.'); return; }
-        if (!date) { alert('Please select a date.'); return; }
-        if (amount <= 0) { alert('Please enter a valid amount.'); return; }
+        if (!ledgerName) { showToast('Please select a ledger.', 'error'); return; }
+        if (!date) { showToast('Please select a date.', 'error'); return; }
+        if (amount <= 0) { showToast('Please enter a valid amount.', 'error'); return; }
 
         const ledger = ledgers.find(l => l.name === ledgerName);
-        if (!ledger) { alert('Ledger not found.'); return; }
-        if (type === 'Debit' && amount > ledger.balance) { alert(`Debit exceeds balance ${ledger.balance.toFixed(2)}.`); return; }
+        if (!ledger) { showToast('Ledger not found.', 'error'); return; }
+        if (type === 'Debit' && amount > ledger.balance) { showToast(`Debit exceeds balance ${fmtCurrency(ledger.balance)}.`, 'error'); return; }
 
         if (type === 'Credit') ledger.balance += amount;
         else ledger.balance -= amount;
@@ -1647,7 +1917,7 @@ document.addEventListener('DOMContentLoaded', function() {
             caption: particular, txn_type: type, amount, balance_after: ledger.balance,
             is_debit: type === 'Debit', source_id: null
         }).select().single();
-        if (error) { alert('DB error: ' + error.message); return; }
+        if (error) { showToast('DB error: ' + error.message, 'error'); return; }
         await sb.from('ledgers').update({ balance: ledger.balance }).eq('id', ledger.id);
 
         ledgerHistory.unshift({
@@ -1662,6 +1932,7 @@ document.addEventListener('DOMContentLoaded', function() {
         renderHistoryTable();
         txnParticularInput.value = ''; txnAmountInput.value = '';
         closeModal(newTransactionModal);
+        showToast('Transaction added', 'success');
     });
 
     /* ============ DELETE HANDLERS ============ */
@@ -1678,7 +1949,7 @@ document.addEventListener('DOMContentLoaded', function() {
             await sb.from('expenses').delete().eq('source_id', sourceId);
             await sb.from('ledger_history').delete().eq('source_id', sourceId);
         }
-        if (ledgerName) await restoreToLedger(ledgerName, amount, caption, type, sourceId);
+        if (ledgerName) await creditToLedger(ledgerName, amount, caption, type, sourceId);
 
         totalExpenseAmount -= amount;
         updateExpenseDisplays();
@@ -1687,6 +1958,7 @@ document.addEventListener('DOMContentLoaded', function() {
         calculateTotals();
         applySearchFilter();
         renderHistoryTable();
+        showToast('Expense deleted', 'success');
     });
 
     bankExpenseTableBody.addEventListener('click', async (e) => {
@@ -1701,7 +1973,7 @@ document.addEventListener('DOMContentLoaded', function() {
             await sb.from('bank_expenses').delete().eq('source_id', sourceId);
             await sb.from('ledger_history').delete().eq('source_id', sourceId);
         }
-        if (ledgerName) await restoreToLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
+        if (ledgerName) await creditToLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
 
         smartPayExpenseAmount -= amount;
         updateSmartPayExpenseDisplay();
@@ -1710,6 +1982,7 @@ document.addEventListener('DOMContentLoaded', function() {
         calculateTotals();
         applySearchFilter();
         renderHistoryTable();
+        showToast('Bank expense deleted', 'success');
     });
 
     smartPayIncomeTableBody.addEventListener('click', async (e) => {
@@ -1717,8 +1990,26 @@ document.addEventListener('DOMContentLoaded', function() {
         const row = btn.closest('tr');
         const amount = parseFloat(row.dataset.amount) || 0;
         const invoice = row.cells[0].textContent;
+        const sourceId = row.dataset.sourceId;
 
         await sb.from('smartpay_income').delete().eq('invoice', invoice).eq('amount', amount);
+
+        if (sourceId) {
+            await sb.from('ledger_history').delete().eq('source_id', sourceId);
+        }
+
+        const spLedger = ledgers.find(l => l.name === SMART_PAY_LEDGER_NAME);
+        if (spLedger) {
+            spLedger.balance -= amount;
+            await sb.from('ledgers').update({ balance: spLedger.balance }).eq('id', spLedger.id);
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+            await sb.from('ledger_history').insert({
+                user_id: currentUser.id, ledger_name: SMART_PAY_LEDGER_NAME, txn_date: dateStr,
+                caption: 'Delete: ' + invoice, txn_type: 'Reversal', amount,
+                balance_after: spLedger.balance, is_debit: true, source_id: null
+            });
+        }
 
         smartPayIncomeAmount -= amount;
         updateSmartPayIncomeDisplay();
@@ -1726,24 +2017,48 @@ document.addEventListener('DOMContentLoaded', function() {
         if (smartPayIncomeTableBody.children.length === 0) renderSmartPayIncomeEmptyState();
         calculateTotals();
         applySearchFilter();
-    });
-
-    ledgerListContainer.addEventListener('click', async (e) => {
-        const btn = e.target.closest('.btn-delete-row'); if (!btn) return;
-        const ledgerName = btn.dataset.ledgerName;
-        const ledgerId = btn.dataset.ledgerId;
-        if (!confirm(`Delete ledger "${ledgerName}"? This will remove all its history.`)) return;
-
-        await sb.from('ledgers').delete().eq('id', ledgerId);
-        await sb.from('ledger_history').delete().eq('ledger_name', ledgerName);
-
-        ledgers = ledgers.filter(l => l.id !== ledgerId);
-        ledgerHistory = ledgerHistory.filter(h => h.ledgerName !== ledgerName);
-
         renderLedgerList();
         updateLedgerDropdowns();
-        populateHistoryFilter();
-        renderHistoryTable();
+        showToast('Income deleted (reversed from Smart Pay Ledger)', 'success');
+    });
+
+    // Ledger row actions (edit + delete)
+    ledgerListContainer.addEventListener('click', async (e) => {
+        // Edit button
+        const editBtn = e.target.closest('.btn-edit-row');
+        if (editBtn) {
+            editingLedgerId = editBtn.dataset.editLedgerId;
+            editLedgerNameInput.value = editBtn.dataset.editLedgerName;
+            editLedgerBalanceInput.value = editBtn.dataset.editLedgerBalance;
+            openModal(editLedgerModal);
+            editLedgerNameInput.focus();
+            editLedgerNameInput.select();
+            return;
+        }
+
+        // Delete button
+        const deleteBtn = e.target.closest('.btn-delete-row');
+        if (deleteBtn) {
+            const ledgerName = deleteBtn.dataset.ledgerName;
+            const ledgerId = deleteBtn.dataset.ledgerId;
+            if (ledgerName === SMART_PAY_LEDGER_NAME) {
+                showToast('Smart Pay Ledger cannot be deleted.', 'error');
+                return;
+            }
+            if (!confirm(`Delete ledger "${ledgerName}"? This will remove all its history.`)) return;
+
+            await sb.from('ledgers').delete().eq('id', ledgerId);
+            await sb.from('ledger_history').delete().eq('ledger_name', ledgerName);
+
+            ledgers = ledgers.filter(l => l.id !== ledgerId);
+            ledgerHistory = ledgerHistory.filter(h => h.ledgerName !== ledgerName);
+
+            renderLedgerList();
+            updateLedgerDropdowns();
+            populateHistoryFilter();
+            renderHistoryTable();
+            showToast('Ledger deleted', 'success');
+        }
     });
 
     historyTableBody.addEventListener('click', async (e) => {
@@ -1751,7 +2066,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const id = btn.dataset.historyId;
         const record = ledgerHistory.find(h => String(h.id) === String(id));
         if (!record) return;
-        if (!confirm(`Delete history entry? "${record.caption}" - ${record.amount.toFixed(2)}`)) return;
+        if (!confirm(`Delete history entry? "${record.caption}" - ${fmtCurrency(record.amount)}`)) return;
 
         const ledger = ledgers.find(l => l.name === record.ledgerName);
         if (ledger) {
@@ -1784,17 +2099,18 @@ document.addEventListener('DOMContentLoaded', function() {
         renderHistoryTable();
         calculateTotals();
         applySearchFilter();
+        showToast('History entry deleted', 'success');
     });
 
     /* ============ DISPLAYS / CALC ============ */
     function updateExpenseDisplays() {
-        headerTotalExpensesEl.textContent = (totalExpenseAmount - smartPayExpenseAmount).toFixed(2);
-        leftTotalExpenseDisplayEl.textContent = totalExpenseAmount.toFixed(2);
+        headerTotalExpensesEl.textContent = fmtCurrency(totalExpenseAmount - smartPayExpenseAmount);
+        leftTotalExpenseDisplayEl.textContent = fmtCurrency(totalExpenseAmount);
     }
-    function updateSmartPayExpenseDisplay() { smartPayExpenseDisplayEl.textContent = smartPayExpenseAmount.toFixed(2); }
+    function updateSmartPayExpenseDisplay() { smartPayExpenseDisplayEl.textContent = fmtCurrency(smartPayExpenseAmount); }
     function updateSmartPayIncomeDisplay() {
-        smartPayIncomeDisplayEl.textContent = smartPayIncomeAmount.toFixed(2);
-        smartPayBalanceDisplayEl.textContent = (smartPayIncomeAmount - smartPayExpenseAmount).toFixed(2);
+        smartPayIncomeDisplayEl.textContent = fmtCurrency(smartPayIncomeAmount);
+        smartPayBalanceDisplayEl.textContent = fmtCurrency(smartPayIncomeAmount - smartPayExpenseAmount);
     }
 
     function calculateTotals() {
@@ -1803,15 +2119,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const cv = parseFloat(input.getAttribute('data-currency')) || 0;
             const count = parseFloat(input.value) || 0;
             const total = cv * count;
-            input.closest('tr').querySelector('.row-total').textContent = total.toFixed(2);
+            input.closest('tr').querySelector('.row-total').textContent = fmtCurrency(total);
             grandTotal += total;
         });
-        denomGrandTotalEl.textContent = grandTotal.toFixed(2);
-        totalCashInput.value = grandTotal.toFixed(2);
+        denomGrandTotalEl.textContent = fmtCurrency(grandTotal);
+        totalCashInput.value = fmtCurrency(grandTotal);
 
         const opening = parseFloat(openingInput.value) || 0;
         const others = parseFloat(othersInput.value) || 0;
-        totalBillInput.value = (opening + others).toFixed(2);
+        totalBillInput.value = fmtCurrency(opening + others);
 
         const combined = totalExpenseAmount + smartPayExpenseAmount;
         const result = (opening + others) - combined - grandTotal + smartPayIncomeAmount;
@@ -1819,10 +2135,10 @@ document.addEventListener('DOMContentLoaded', function() {
             shiftCashResultEl.textContent = 'Tally';
             shiftCashResultEl.classList.add('tally');
         } else {
-            shiftCashResultEl.textContent = result.toFixed(2);
+            shiftCashResultEl.textContent = fmtCurrency(result);
             shiftCashResultEl.classList.remove('tally');
         }
-        expenceInput.value = totalExpenseAmount.toFixed(2);
+        expenceInput.value = fmtCurrency(totalExpenseAmount);
     }
 
     denomInputs.forEach(i => { i.addEventListener('input', calculateTotals); i.addEventListener('change', calculateTotals); });
@@ -1858,52 +2174,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /* ============ SAVE CHANGES ============ */
     saveChangesBtn.addEventListener('click', async () => {
-        if (!currentUser) { alert('Not logged in.'); return; }
+        if (!currentUser) { showToast('Not logged in.', 'error'); return; }
         try {
-            // Save opening, others, and denomination counts to localStorage as "working state"
-            const state = {
-                opening: openingInput.value,
-                others: othersInput.value,
-                denominations: Array.from(denomInputs).map(i => i.value),
-                savedAt: new Date().toISOString()
-            };
-            localStorage.setItem('blueLightWorkingState_' + currentUser.id, JSON.stringify(state));
-
-            // Refresh all totals so UI reflects current state
-            calculateTotals();
-
-            // Show confirmation briefly
-            const originalText = saveChangesBtn.textContent;
-            saveChangesBtn.textContent = '✓ Saved!';
-            saveChangesBtn.style.backgroundColor = 'var(--accent-green)';
-            saveChangesBtn.style.borderColor = 'var(--accent-green)';
-            setTimeout(() => {
-                saveChangesBtn.textContent = originalText;
-                saveChangesBtn.style.backgroundColor = '';
-                saveChangesBtn.style.borderColor = '';
-            }, 1500);
+            const saved = await saveDailyData();
+            if (saved) {
+                calculateTotals();
+                const orig = saveChangesBtn.textContent;
+                saveChangesBtn.textContent = '✓ Saved!';
+                saveChangesBtn.style.backgroundColor = 'var(--accent-green)';
+                saveChangesBtn.style.borderColor = 'var(--accent-green)';
+                setTimeout(() => {
+                    saveChangesBtn.textContent = orig;
+                    saveChangesBtn.style.backgroundColor = '';
+                    saveChangesBtn.style.borderColor = '';
+                }, 1500);
+                showToast('Daily data saved to database', 'success');
+            } else {
+                showToast('Error saving to database', 'error');
+            }
         } catch (err) {
-            alert('Error saving: ' + err.message);
+            showToast('Error: ' + err.message, 'error');
         }
     });
-
-    // Load working state (opening, others, denominations) for this user
-    function loadWorkingState() {
-        if (!currentUser) return;
-        try {
-            const raw = localStorage.getItem('blueLightWorkingState_' + currentUser.id);
-            if (!raw) return;
-            const state = JSON.parse(raw);
-            if (state.opening) openingInput.value = state.opening;
-            if (state.others) othersInput.value = state.others;
-            if (Array.isArray(state.denominations)) {
-                denomInputs.forEach((input, i) => {
-                    if (state.denominations[i] !== undefined) input.value = state.denominations[i];
-                });
-            }
-            calculateTotals();
-        } catch (e) { /* ignore */ }
-    }
 
     /* ============ SEARCH ============ */
     function applySearchFilter() {
@@ -1994,36 +2286,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     updateCalcDisplay();
     calculateTotals();
-
-    // Auto-save working state whenever opening / others / denominations change
-    openingInput.addEventListener('change', () => {
-        if (currentUser) {
-            const st = { opening: openingInput.value, others: othersInput.value,
-                denominations: Array.from(denomInputs).map(i => i.value) };
-            localStorage.setItem('blueLightWorkingState_' + currentUser.id, JSON.stringify(st));
-        }
-    });
-    othersInput.addEventListener('change', () => {
-        if (currentUser) {
-            const st = { opening: openingInput.value, others: othersInput.value,
-                denominations: Array.from(denomInputs).map(i => i.value) };
-            localStorage.setItem('blueLightWorkingState_' + currentUser.id, JSON.stringify(st));
-        }
-    });
-    denomInputs.forEach(i => i.addEventListener('change', () => {
-        if (currentUser) {
-            const st = { opening: openingInput.value, others: othersInput.value,
-                denominations: Array.from(denomInputs).map(x => x.value) };
-            localStorage.setItem('blueLightWorkingState_' + currentUser.id, JSON.stringify(st));
-        }
-    }));
-
-    // Hook into showApp to load working state after login
-    const originalShowApp = showApp;
-    showApp = function(user) {
-        originalShowApp(user);
-        setTimeout(loadWorkingState, 500);
-    };
 
     // Placeholder empty states
     renderExpenseEmptyState();
