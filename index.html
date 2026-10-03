@@ -130,7 +130,7 @@
             background-color: #ffffff; border: 1px solid var(--border-color);
             border-radius: 6px;
             box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-            min-width: 180px; padding: 6px 0; z-index: 200; margin-top: 4px;
+            min-width: 200px; padding: 6px 0; z-index: 200; margin-top: 4px;
             pointer-events: auto;
         }
         .menu-item:hover .sub-menu { display: block; }
@@ -550,6 +550,93 @@
         .calc-btn.clear { color: #ef4444; }
         .calc-btn.span-two { grid-column: span 2; }
 
+        /* Multi Ledger Modal specific */
+        .multi-ledger-input-row {
+            display: flex; gap: 10px; align-items: flex-end;
+        }
+        .multi-ledger-input-row .modal-form-group {
+            flex: 1;
+        }
+        .add-btn {
+            padding: 10px 18px; border-radius: 6px;
+            background-color: var(--accent-green); color: #fff;
+            border: none; font-family: inherit;
+            font-size: 14px; font-weight: 600;
+            cursor: pointer; transition: all .2s;
+            height: 41px;
+            display: flex; align-items: center; gap: 6px;
+            white-space: nowrap;
+        }
+        .add-btn:hover {
+            background-color: #059669;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        .add-btn:active { transform: translateY(0); }
+
+        .ml-balance-list {
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        .ml-balance-list table {
+            width: 100%; border-collapse: collapse; font-size: 14px;
+        }
+        .ml-balance-list th {
+            background-color: #f1f5f9; font-size: 12px;
+            padding: 10px 14px; text-align: left;
+            position: sticky; top: 0; z-index: 1;
+            color: var(--text-muted); text-transform: uppercase;
+            letter-spacing: .5px; font-weight: 600;
+        }
+        .ml-balance-list td {
+            padding: 10px 14px; font-size: 14px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .ml-balance-list tr:last-child td { border-bottom: none; }
+        .ml-balance-list .ml-name {
+            font-weight: 500;
+        }
+        .ml-balance-list .ml-balance {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            font-weight: 600;
+            color: var(--primary-dark);
+        }
+        .ml-balance-list .ml-balance.negative { color: var(--accent-red); }
+        .ml-balance-list .ml-balance.zero { color: var(--text-muted); font-weight: 500; }
+        .ml-balance-list .ml-action {
+            width: 44px; text-align: center;
+        }
+        .ml-balance-list .ml-action button {
+            background: none; border: none; color: var(--text-muted);
+            cursor: pointer; display: inline-flex; align-items: center;
+            justify-content: center; padding: 4px; border-radius: 4px;
+            transition: all .2s;
+        }
+        .ml-balance-list .ml-action button:hover {
+            background-color: #fee2e2; color: var(--accent-red);
+        }
+        .ml-total-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 18px;
+            background: linear-gradient(135deg, var(--header-bg) 0%, #1e293b 100%);
+            color: #fff; font-weight: 700;
+            font-size: 16px;
+            border-radius: 8px;
+            margin-top: 14px;
+        }
+        .ml-total-row .ml-total-label { letter-spacing: .8px; }
+        .ml-total-row .ml-total-value {
+            color: var(--accent-yellow);
+            font-size: 24px;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 0 10px rgba(250,204,21,0.3);
+        }
+        .ml-total-row .ml-total-value.negative { color: var(--accent-red); text-shadow: none; }
+
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -629,6 +716,10 @@
                 <div class="sub-menu-item" id="openLedgerModal">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
                     Ledger
+                </div>
+                <div class="sub-menu-item" id="openMultiLedgerModal">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="8" height="16" rx="1"></rect><rect x="14" y="4" width="8" height="16" rx="1"></rect></svg>
+                    Multi Ledger
                 </div>
                 <div class="sub-menu-item" id="openLedgerHistoryModal">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
@@ -874,6 +965,48 @@
     </div>
 </div>
 
+<!-- ============ MULTI LEDGER MODAL (SELECT FROM EXISTING) ============ -->
+<div class="modal-overlay" id="multiLedgerModal">
+    <div class="modal-content" style="width: 550px;">
+        <div class="modal-header"><h3>Multi Ledger</h3><button class="modal-close" id="closeMultiLedgerModal">&times;</button></div>
+        <div class="modal-body" style="max-height: 600px;">
+            <div class="multi-ledger-input-row">
+                <div class="modal-form-group" style="flex: 2;">
+                    <label for="multiLedgerSelect">Select Ledger</label>
+                    <select id="multiLedgerSelect"></select>
+                </div>
+                <button class="add-btn" id="multiLedgerAddBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Add
+                </button>
+            </div>
+
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-muted);">Selected Ledgers</div>
+            <div class="ml-balance-list">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">No.</th>
+                            <th>Ledger Name</th>
+                            <th style="width: 160px; text-align: right;">Balance</th>
+                            <th style="width: 50px; text-align: center;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="multiLedgerBalanceBody"></tbody>
+                </table>
+            </div>
+
+            <div class="ml-total-row">
+                <span class="ml-total-label">TOTAL BALANCE</span>
+                <span class="ml-total-value" id="multiLedgerTotalBalance">0.00</span>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-cancel" id="closeMultiLedgerBtn">Close</button>
+        </div>
+    </div>
+</div>
+
 <!-- EDIT LEDGER MODAL -->
 <div class="modal-overlay" id="editLedgerModal">
     <div class="modal-content">
@@ -1104,6 +1237,7 @@ document.addEventListener('DOMContentLoaded', function() {
             currentUser = null;
             showAuthScreen();
             ledgers = []; ledgerHistory = [];
+            multiLedgerEntries = [];
             totalExpenseAmount = 0; smartPayExpenseAmount = 0; smartPayIncomeAmount = 0;
             dataLoaded = false;
         }
@@ -1179,7 +1313,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const ledgerOpeningBalanceInput = document.getElementById('ledgerOpeningBalance');
     const ledgerListContainer = document.getElementById('ledgerList');
 
-    // Edit Ledger modal elements
+    // Multi Ledger modal elements
+    const multiLedgerModal = document.getElementById('multiLedgerModal');
+    const openMultiLedgerModalBtn = document.getElementById('openMultiLedgerModal');
+    const closeMultiLedgerModalBtn = document.getElementById('closeMultiLedgerModal');
+    const closeMultiLedgerBtn = document.getElementById('closeMultiLedgerBtn');
+    const multiLedgerSelect = document.getElementById('multiLedgerSelect');
+    const multiLedgerAddBtn = document.getElementById('multiLedgerAddBtn');
+    const multiLedgerBalanceBody = document.getElementById('multiLedgerBalanceBody');
+    const multiLedgerTotalBalanceEl = document.getElementById('multiLedgerTotalBalance');
+
     const editLedgerModal = document.getElementById('editLedgerModal');
     const closeEditLedgerModalBtn = document.getElementById('closeEditLedgerModal');
     const cancelEditLedgerBtn = document.getElementById('cancelEditLedger');
@@ -1216,8 +1359,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let smartPayIncomeAmount = 0.00;
     let ledgers = [];
     let ledgerHistory = [];
+    let multiLedgerIds = []; // IDs of ledgers selected in Multi Ledger popup
     let searchTerm = '';
-    let historyIdCounter = 1;
     let dataLoaded = false;
 
     const SMART_PAY_LEDGER_NAME = 'Smart Pay Ledger';
@@ -1319,7 +1462,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     /* ============================================================
-       SUPABASE DATA LOADING (Ledgers, Expenses, Income)
+       SUPABASE DATA LOADING
        ============================================================ */
     async function ensureSmartPayLedger() {
         let existing = ledgers.find(l => l.name === SMART_PAY_LEDGER_NAME);
@@ -1331,10 +1474,7 @@ document.addEventListener('DOMContentLoaded', function() {
             balance: 0
         }).select().single();
 
-        if (error) {
-            console.error('Failed to create Smart Pay Ledger:', error);
-            return null;
-        }
+        if (error) { console.error('Failed to create Smart Pay Ledger:', error); return null; }
         const newLedger = { id: data.id, name: data.name, balance: 0 };
         ledgers.push(newLedger);
         return newLedger;
@@ -1518,7 +1658,99 @@ document.addEventListener('DOMContentLoaded', function() {
     cancelLedgerBtn.addEventListener('click', () => closeModal(ledgerModal));
     ledgerModal.addEventListener('click', e => { if (e.target === ledgerModal) closeModal(ledgerModal); });
 
-    // Edit Ledger modal
+    /* ============ MULTI LEDGER MODAL (SELECT EXISTING) ============ */
+    function populateMultiLedgerSelect() {
+        const cur = multiLedgerSelect.value;
+        multiLedgerSelect.innerHTML = '';
+        // List all ledgers NOT already selected
+        const available = ledgers.filter(l => !multiLedgerIds.includes(l.id));
+        if (available.length === 0) {
+            const o = document.createElement('option');
+            o.value = ''; o.textContent = '-- No More Ledgers --'; o.disabled = true; o.selected = true;
+            multiLedgerSelect.appendChild(o);
+        } else {
+            available.forEach(l => {
+                const o = document.createElement('option');
+                o.value = l.id;
+                o.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
+                multiLedgerSelect.appendChild(o);
+            });
+            if ([...multiLedgerSelect.options].some(o => o.value === cur)) {
+                multiLedgerSelect.value = cur;
+            }
+        }
+    }
+
+    function renderMultiLedgerBalances() {
+        const selected = ledgers.filter(l => multiLedgerIds.includes(l.id));
+        if (selected.length === 0) {
+            multiLedgerBalanceBody.innerHTML = `<tr class="empty-row"><td colspan="4">No ledgers selected yet. Use the combo box above.</td></tr>`;
+            multiLedgerTotalBalanceEl.textContent = fmtCurrency(0);
+            multiLedgerTotalBalanceEl.classList.remove('negative');
+            return;
+        }
+        multiLedgerBalanceBody.innerHTML = '';
+        let total = 0;
+        selected.forEach((l, i) => {
+            total += l.balance;
+            const row = document.createElement('tr');
+            let balClass = 'ml-balance';
+            if (l.balance < 0) balClass += ' negative';
+            else if (l.balance === 0) balClass += ' zero';
+            row.innerHTML = `
+                <td style="color: var(--text-muted); font-weight: 600;">${i+1}</td>
+                <td class="ml-name">${l.name}</td>
+                <td class="${balClass}">${fmtCurrency(l.balance)}</td>
+                <td class="ml-action">
+                    <button title="Remove" data-ml-id="${l.id}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>
+                </td>
+            `;
+            multiLedgerBalanceBody.appendChild(row);
+        });
+        multiLedgerTotalBalanceEl.textContent = fmtCurrency(total);
+        if (total < 0) multiLedgerTotalBalanceEl.classList.add('negative');
+        else multiLedgerTotalBalanceEl.classList.remove('negative');
+    }
+
+    function addMultiLedgerEntry() {
+        const id = multiLedgerSelect.value;
+        if (!id) { showToast('Please select a ledger.', 'error'); return; }
+        if (multiLedgerIds.includes(id)) { showToast('This ledger is already added.', 'error'); return; }
+
+        multiLedgerIds.push(id);
+        populateMultiLedgerSelect();
+        renderMultiLedgerBalances();
+        const l = ledgers.find(x => x.id === id);
+        showToast(`Added "${l ? l.name : ''}" to Multi Ledger`, 'success');
+    }
+
+    multiLedgerAddBtn.addEventListener('click', addMultiLedgerEntry);
+
+    // Remove entry from Multi Ledger
+    multiLedgerBalanceBody.addEventListener('click', e => {
+        const btn = e.target.closest('button[data-ml-id]');
+        if (!btn) return;
+        const id = btn.dataset.mlId;
+        multiLedgerIds = multiLedgerIds.filter(x => x !== id);
+        populateMultiLedgerSelect();
+        renderMultiLedgerBalances();
+        showToast('Ledger removed', 'success');
+    });
+
+    function openMultiLedger() {
+        populateMultiLedgerSelect();
+        renderMultiLedgerBalances();
+        openModal(multiLedgerModal);
+    }
+
+    openMultiLedgerModalBtn.addEventListener('click', openMultiLedger);
+    closeMultiLedgerModalBtn.addEventListener('click', () => closeModal(multiLedgerModal));
+    closeMultiLedgerBtn.addEventListener('click', () => closeModal(multiLedgerModal));
+    multiLedgerModal.addEventListener('click', e => { if (e.target === multiLedgerModal) closeModal(multiLedgerModal); });
+
+    /* ============ EDIT LEDGER MODAL ============ */
     closeEditLedgerModalBtn.addEventListener('click', () => closeModal(editLedgerModal));
     cancelEditLedgerBtn.addEventListener('click', () => closeModal(editLedgerModal));
     editLedgerModal.addEventListener('click', e => { if (e.target === editLedgerModal) closeModal(editLedgerModal); });
@@ -1811,7 +2043,6 @@ document.addEventListener('DOMContentLoaded', function() {
         showToast('Ledger created', 'success');
     });
 
-    // EDIT LEDGER SUBMIT
     submitEditLedgerBtn.addEventListener('click', async () => {
         if (!editingLedgerId) { showToast('No ledger selected.', 'error'); return; }
         const newName = editLedgerNameInput.value.trim();
@@ -1823,7 +2054,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const ledger = ledgers.find(l => l.id === editingLedgerId);
         if (!ledger) { showToast('Ledger not found.', 'error'); return; }
 
-        // Check for duplicate name (excluding itself)
         if (ledgers.some(l => l.name === newName && l.id !== editingLedgerId)) {
             showToast('Another ledger with this name already exists.', 'error');
             return;
@@ -1834,41 +2064,31 @@ document.addEventListener('DOMContentLoaded', function() {
         const nameChanged = oldName !== newName;
         const balanceChanged = Math.abs(oldBalance - newBalance) > 0.001;
 
-        // Prevent renaming Smart Pay Ledger
         if (oldName === SMART_PAY_LEDGER_NAME && nameChanged) {
             showToast('Smart Pay Ledger name cannot be changed.', 'error');
             return;
         }
 
-        // Update ledger in DB
         const { error } = await sb.from('ledgers').update({
-            name: newName,
-            balance: newBalance
+            name: newName, balance: newBalance
         }).eq('id', editingLedgerId);
         if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
-        // If name changed, update ledger_history records that reference the old name
         if (nameChanged) {
             await sb.from('ledger_history').update({ ledger_name: newName }).eq('ledger_name', oldName);
             ledgerHistory.forEach(h => { if (h.ledgerName === oldName) h.ledgerName = newName; });
         }
 
-        // If balance changed, add an adjustment entry to history so it stays consistent
         if (balanceChanged) {
             const diff = newBalance - oldBalance;
             const isDebit = diff < 0;
             const today = new Date();
             const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
             const { data: adj } = await sb.from('ledger_history').insert({
-                user_id: currentUser.id,
-                ledger_name: newName,
-                txn_date: dateStr,
-                caption: 'Manual Adjustment',
-                txn_type: 'Adjustment',
-                amount: Math.abs(diff),
-                balance_after: newBalance,
-                is_debit: isDebit,
-                source_id: null
+                user_id: currentUser.id, ledger_name: newName, txn_date: dateStr,
+                caption: 'Manual Adjustment', txn_type: 'Adjustment',
+                amount: Math.abs(diff), balance_after: newBalance,
+                is_debit: isDebit, source_id: null
             }).select().single();
             if (adj) {
                 ledgerHistory.unshift({
@@ -1879,7 +2099,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Update local state
         ledger.name = newName;
         ledger.balance = newBalance;
 
@@ -2022,9 +2241,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showToast('Income deleted (reversed from Smart Pay Ledger)', 'success');
     });
 
-    // Ledger row actions (edit + delete)
     ledgerListContainer.addEventListener('click', async (e) => {
-        // Edit button
         const editBtn = e.target.closest('.btn-edit-row');
         if (editBtn) {
             editingLedgerId = editBtn.dataset.editLedgerId;
@@ -2036,7 +2253,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Delete button
         const deleteBtn = e.target.closest('.btn-delete-row');
         if (deleteBtn) {
             const ledgerName = deleteBtn.dataset.ledgerName;
@@ -2052,6 +2268,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             ledgers = ledgers.filter(l => l.id !== ledgerId);
             ledgerHistory = ledgerHistory.filter(h => h.ledgerName !== ledgerName);
+            multiLedgerIds = multiLedgerIds.filter(id => id !== ledgerId);
 
             renderLedgerList();
             updateLedgerDropdowns();
