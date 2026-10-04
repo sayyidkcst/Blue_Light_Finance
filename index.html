@@ -1374,6 +1374,7 @@ document.addEventListener('DOMContentLoaded', function() {
             showAuthScreen();
             ledgers = []; ledgerHistory = [];
             multiLedgerIds = [];
+            allExpenses = []; allBankExpenses = []; allIncome = [];
             totalExpenseAmount = 0; smartPayExpenseAmount = 0; smartPayIncomeAmount = 0;
             dataLoaded = false;
         }
@@ -1502,14 +1503,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const closeCalculatorBtn = document.getElementById('closeCalculatorBtn');
     const calcDisplay = document.getElementById('calcDisplay');
 
-    let totalExpenseAmount = 0.00;
-    let smartPayExpenseAmount = 0.00;
-    let smartPayIncomeAmount = 0.00;
+    // Daily totals (for the selected date)
+    let totalExpenseAmount = 0.00;          // Cash expenses for selected date
+    let smartPayExpenseAmount = 0.00;       // Bank expenses for selected date
+    let smartPayIncomeAmount = 0.00;        // Income for selected date
+
     let ledgers = [];
     let ledgerHistory = [];
     let multiLedgerIds = [];
     let searchTerm = '';
     let dataLoaded = false;
+
+    // Store complete datasets
+    let allExpenses = [];       // {caption, ledger_name, amount, expense_type, source_id, date}
+    let allBankExpenses = [];   // {caption, ledger_name, amount, source_id, date}
+    let allIncome = [];         // {invoice, amount, source_id, date}
 
     const SMART_PAY_LEDGER_NAME = 'Smart Pay Ledger';
 
@@ -1548,7 +1556,8 @@ document.addEventListener('DOMContentLoaded', function() {
             connStatusEl.textContent = '● Loading…';
             await loadDailyData();
             connStatusEl.textContent = '● Online';
-            // Re-apply filters to show only current day
+            // Re-render tables and recalculate totals for the selected date
+            renderDailyTables();
             applySearchFilter();
             showToast('Loaded data for ' + datePicker.value, 'success');
         }
@@ -1665,6 +1674,15 @@ document.addEventListener('DOMContentLoaded', function() {
         return newLedger;
     }
 
+    function extractDate(createdAt) {
+        if (!createdAt) return '';
+        const d = new Date(createdAt);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth()+1).padStart(2,'0');
+        const dd = String(d.getDate()).padStart(2,'0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
     async function loadAllData() {
         if (!currentUser || dataLoaded) return;
         dataLoaded = true;
@@ -1687,48 +1705,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 isDebit: r.is_debit, sourceId: r.source_id
             }));
 
+            // Load expenses
             const { data: expData, error: e3 } = await sb.from('expenses').select('*').order('created_at');
             if (e3) throw e3;
-            totalExpenseAmount = 0;
-            expenseTableBody.innerHTML = '';
-            // Store all expense data for filtering
-            (expData || []).forEach(r => {
-                addExpenseRow(r.caption, r.ledger_name, parseFloat(r.amount)||0, r.expense_type, r.source_id, r.created_at);
-                totalExpenseAmount += parseFloat(r.amount) || 0;
-            });
-            if ((expData||[]).length === 0) renderExpenseEmptyState();
+            allExpenses = (expData || []).map(r => ({
+                caption: r.caption,
+                ledger_name: r.ledger_name,
+                amount: parseFloat(r.amount) || 0,
+                expense_type: r.expense_type,
+                source_id: r.source_id,
+                date: extractDate(r.created_at)
+            }));
 
+            // Load bank expenses
             const { data: bankData, error: e4 } = await sb.from('bank_expenses').select('*').order('created_at');
             if (e4) throw e4;
-            smartPayExpenseAmount = 0;
-            bankExpenseTableBody.innerHTML = '';
-            (bankData || []).forEach(r => {
-                addBankExpenseRow(r.caption, r.ledger_name, parseFloat(r.amount)||0, r.source_id, r.created_at);
-                smartPayExpenseAmount += parseFloat(r.amount) || 0;
-            });
-            if ((bankData||[]).length === 0) renderBankExpenseEmptyState();
+            allBankExpenses = (bankData || []).map(r => ({
+                caption: r.caption,
+                ledger_name: r.ledger_name,
+                amount: parseFloat(r.amount) || 0,
+                source_id: r.source_id,
+                date: extractDate(r.created_at)
+            }));
 
+            // Load income
             const { data: incomeData, error: e5 } = await sb.from('smartpay_income').select('*').order('created_at');
             if (e5) throw e5;
-            smartPayIncomeAmount = 0;
-            smartPayIncomeTableBody.innerHTML = '';
-            (incomeData || []).forEach(r => {
-                addIncomeRow(r.invoice, parseFloat(r.amount)||0, r.id, r.created_at);
-                smartPayIncomeAmount += parseFloat(r.amount) || 0;
-            });
-            if ((incomeData||[]).length === 0) renderSmartPayIncomeEmptyState();
+            allIncome = (incomeData || []).map(r => ({
+                invoice: r.invoice,
+                amount: parseFloat(r.amount) || 0,
+                source_id: r.id,
+                date: extractDate(r.created_at)
+            }));
 
             await loadMultiLedgerSettings();
 
             renderLedgerList();
             updateLedgerDropdowns();
             populateHistoryFilter();
-            updateExpenseDisplays();
-            updateSmartPayExpenseDisplay();
-            updateSmartPayIncomeDisplay();
             updateMultiLedgerTotalDisplay();
             calculateTotals();
-            applySearchFilter();
+
+            // Render tables for the currently selected date
+            renderDailyTables();
 
             await loadDailyData();
 
@@ -1746,19 +1765,19 @@ document.addEventListener('DOMContentLoaded', function() {
        RENDER HELPERS
        ============================================================ */
     function renderExpenseEmptyState() {
-        expenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="5">No expenses added yet.</td></tr>`;
+        expenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="5">No expenses for this date.</td></tr>`;
     }
     function renderBankExpenseEmptyState() {
-        bankExpenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="4">No bank expenses added yet.</td></tr>`;
+        bankExpenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="4">No bank expenses for this date.</td></tr>`;
     }
     function renderSmartPayIncomeEmptyState() {
-        smartPayIncomeTableBody.innerHTML = `<tr class="empty-row"><td colspan="3">No income added yet.</td></tr>`;
+        smartPayIncomeTableBody.innerHTML = `<tr class="empty-row"><td colspan="3">No income for this date.</td></tr>`;
     }
     function renderLedgerEmptyState() {
         ledgerListContainer.innerHTML = `<tr class="empty-row"><td colspan="4">No ledgers added yet.</td></tr>`;
     }
 
-    function addExpenseRow(caption, ledgerName, amount, type, sourceId, createdAt) {
+    function addExpenseRow(caption, ledgerName, amount, type, sourceId, dateStr) {
         const emptyRow = expenseTableBody.querySelector('.empty-row');
         if (emptyRow) emptyRow.remove();
         const newRow = document.createElement('tr');
@@ -1774,18 +1793,11 @@ document.addEventListener('DOMContentLoaded', function() {
         newRow.dataset.caption = caption;
         newRow.dataset.type = type;
         newRow.dataset.sourceId = sourceId || '';
-        // Store the creation date for filtering (YYYY-MM-DD)
-        if (createdAt) {
-            const d = new Date(createdAt);
-            const yyyy = d.getFullYear();
-            const mm = String(d.getMonth()+1).padStart(2,'0');
-            const dd = String(d.getDate()).padStart(2,'0');
-            newRow.dataset.date = `${yyyy}-${mm}-${dd}`;
-        }
+        newRow.dataset.date = dateStr || '';
         expenseTableBody.appendChild(newRow);
     }
 
-    function addBankExpenseRow(caption, ledgerName, amount, sourceId, createdAt) {
+    function addBankExpenseRow(caption, ledgerName, amount, sourceId, dateStr) {
         const emptyRow = bankExpenseTableBody.querySelector('.empty-row');
         if (emptyRow) emptyRow.remove();
         const newRow = document.createElement('tr');
@@ -1800,17 +1812,11 @@ document.addEventListener('DOMContentLoaded', function() {
         newRow.dataset.ledgerName = ledgerName;
         newRow.dataset.caption = caption;
         newRow.dataset.sourceId = sourceId || '';
-        if (createdAt) {
-            const d = new Date(createdAt);
-            const yyyy = d.getFullYear();
-            const mm = String(d.getMonth()+1).padStart(2,'0');
-            const dd = String(d.getDate()).padStart(2,'0');
-            newRow.dataset.date = `${yyyy}-${mm}-${dd}`;
-        }
+        newRow.dataset.date = dateStr || '';
         bankExpenseTableBody.appendChild(newRow);
     }
 
-    function addIncomeRow(invoice, amount, sourceId, createdAt) {
+    function addIncomeRow(invoice, amount, sourceId, dateStr) {
         const emptyRow = smartPayIncomeTableBody.querySelector('.empty-row');
         if (emptyRow) emptyRow.remove();
         const newRow = document.createElement('tr');
@@ -1823,14 +1829,85 @@ document.addEventListener('DOMContentLoaded', function() {
             </td>`;
         newRow.dataset.amount = amount;
         newRow.dataset.sourceId = sourceId || '';
-        if (createdAt) {
-            const d = new Date(createdAt);
-            const yyyy = d.getFullYear();
-            const mm = String(d.getMonth()+1).padStart(2,'0');
-            const dd = String(d.getDate()).padStart(2,'0');
-            newRow.dataset.date = `${yyyy}-${mm}-${dd}`;
-        }
+        newRow.dataset.date = dateStr || '';
         smartPayIncomeTableBody.appendChild(newRow);
+    }
+
+    /* ============================================================
+       DAILY FILTER + TOTALS
+       ============================================================ */
+    function renderDailyTables() {
+        const selectedDate = datePicker.value;
+
+        // Rebuild cash expense table
+        expenseTableBody.innerHTML = '';
+        const todayExpenses = allExpenses.filter(e => e.date === selectedDate);
+        if (todayExpenses.length === 0) {
+            renderExpenseEmptyState();
+        } else {
+            todayExpenses.forEach(e => {
+                addExpenseRow(e.caption, e.ledger_name, e.amount, e.expense_type, e.source_id, e.date);
+            });
+        }
+
+        // Rebuild bank expense table
+        bankExpenseTableBody.innerHTML = '';
+        const todayBank = allBankExpenses.filter(e => e.date === selectedDate);
+        if (todayBank.length === 0) {
+            renderBankExpenseEmptyState();
+        } else {
+            todayBank.forEach(e => {
+                addBankExpenseRow(e.caption, e.ledger_name, e.amount, e.source_id, e.date);
+            });
+        }
+
+        // Rebuild income table
+        smartPayIncomeTableBody.innerHTML = '';
+        const todayIncome = allIncome.filter(e => e.date === selectedDate);
+        if (todayIncome.length === 0) {
+            renderSmartPayIncomeEmptyState();
+        } else {
+            todayIncome.forEach(e => {
+                addIncomeRow(e.invoice, e.amount, e.source_id, e.date);
+            });
+        }
+
+        recalculateDailyTotals();
+    }
+
+    function recalculateDailyTotals() {
+        const selectedDate = datePicker.value;
+
+        // Cash expenses for the selected date
+        const dailyCashExpense = allExpenses
+            .filter(e => e.date === selectedDate)
+            .reduce((sum, e) => sum + e.amount, 0);
+
+        // Bank expenses for the selected date
+        const dailyBankExpense = allBankExpenses
+            .filter(e => e.date === selectedDate)
+            .reduce((sum, e) => sum + e.amount, 0);
+
+        // Income for the selected date
+        const dailyIncome = allIncome
+            .filter(e => e.date === selectedDate)
+            .reduce((sum, e) => sum + e.amount, 0);
+
+        // Update displays with daily totals
+        leftTotalExpenseDisplayEl.textContent = fmtCurrency(dailyCashExpense);
+        smartPayExpenseDisplayEl.textContent = fmtCurrency(dailyBankExpense);
+        smartPayIncomeDisplayEl.textContent = fmtCurrency(dailyIncome);
+
+        // Header total = cash expenses for the day
+        headerTotalExpensesEl.textContent = fmtCurrency(dailyCashExpense);
+
+        // Update internal totals used for shift cash calculation
+        totalExpenseAmount = dailyCashExpense;
+        smartPayExpenseAmount = dailyBankExpense;
+        smartPayIncomeAmount = dailyIncome;
+
+        calculateTotals();
+        updateMultiLedgerTotalDisplay();
     }
 
     /* ============ MODALS ============ */
@@ -2530,6 +2607,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (amount > ledger.balance) { showToast(`Amount exceeds balance of ${fmtCurrency(ledger.balance)}.`, 'error'); return; }
 
         const sourceId = 'exp-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
         const { error } = await sb.from('expenses').insert({
             user_id: currentUser.id, caption, ledger_name: ledgerName,
             amount, expense_type: type, source_id: sourceId
@@ -2537,17 +2617,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
         await deductFromLedger(ledgerName, amount, caption, type, sourceId);
-        // When adding a new expense, we don't have a createdAt from DB, so we use now
-        const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth()+1).padStart(2,'0');
-        const dd = String(now.getDate()).padStart(2,'0');
-        const todayStr = `${yyyy}-${mm}-${dd}`;
-        addExpenseRow(caption, ledgerName, amount, type, sourceId, todayStr);
-        totalExpenseAmount += amount;
-        updateExpenseDisplays();
-        calculateTotals();
+
+        allExpenses.push({
+            caption, ledger_name: ledgerName, amount, expense_type: type,
+            source_id: sourceId, date: todayStr
+        });
+
+        renderDailyTables();
         applySearchFilter();
+
         expenseCaptionInput.value = ''; expenseAmountInput.value = '';
         closeModal(expenseModal);
         showToast('Expense added successfully', 'success');
@@ -2566,22 +2644,23 @@ document.addEventListener('DOMContentLoaded', function() {
         if (amount > ledger.balance) { showToast(`Amount exceeds balance of ${fmtCurrency(ledger.balance)}.`, 'error'); return; }
 
         const sourceId = 'bnk-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
         const { error } = await sb.from('bank_expenses').insert({
             user_id: currentUser.id, caption, ledger_name: ledgerName, amount, source_id: sourceId
         });
         if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
         await deductFromLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
-        const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth()+1).padStart(2,'0');
-        const dd = String(now.getDate()).padStart(2,'0');
-        const todayStr = `${yyyy}-${mm}-${dd}`;
-        addBankExpenseRow(caption, ledgerName, amount, sourceId, todayStr);
-        smartPayExpenseAmount += amount;
-        updateSmartPayExpenseDisplay();
-        calculateTotals();
+
+        allBankExpenses.push({
+            caption, ledger_name: ledgerName, amount, source_id: sourceId, date: todayStr
+        });
+
+        renderDailyTables();
         applySearchFilter();
+
         bankExpenseCaptionInput.value = ''; bankExpenseAmountInput.value = '';
         closeModal(bankExpenseModal);
         showToast('Bank expense added', 'success');
@@ -2599,6 +2678,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!ledger) { showToast('Ledger not found.', 'error'); return; }
 
         const sourceId = 'inc-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 
         const { error } = await sb.from('smartpay_income').insert({
             user_id: currentUser.id, invoice, amount
@@ -2607,16 +2688,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         await creditToLedger(ledgerName, amount, invoice, 'Income', sourceId);
 
-        const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth()+1).padStart(2,'0');
-        const dd = String(now.getDate()).padStart(2,'0');
-        const todayStr = `${yyyy}-${mm}-${dd}`;
-        addIncomeRow(invoice, amount, sourceId, todayStr);
-        smartPayIncomeAmount += amount;
-        updateSmartPayIncomeDisplay();
-        calculateTotals();
+        allIncome.push({
+            invoice, amount, source_id: sourceId, date: todayStr
+        });
+
+        renderDailyTables();
         applySearchFilter();
+
         smartPayInvoiceInput.value = ''; smartPayIncomeAmountInput.value = '';
         closeModal(smartPayIncomeModal);
         showToast(`Income added to "${ledgerName}"`, 'success');
@@ -2873,11 +2951,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (ledgerName) await creditToLedger(ledgerName, amount, caption, type, sourceId);
 
-        totalExpenseAmount -= amount;
-        updateExpenseDisplays();
-        row.remove();
-        if (expenseTableBody.children.length === 0) renderExpenseEmptyState();
-        calculateTotals();
+        allExpenses = allExpenses.filter(e => e.source_id !== sourceId);
+
+        renderDailyTables();
         applySearchFilter();
         renderHistoryTable();
         showToast('Expense deleted', 'success');
@@ -2897,11 +2973,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (ledgerName) await creditToLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
 
-        smartPayExpenseAmount -= amount;
-        updateSmartPayExpenseDisplay();
-        row.remove();
-        if (bankExpenseTableBody.children.length === 0) renderBankExpenseEmptyState();
-        calculateTotals();
+        allBankExpenses = allBankExpenses.filter(e => e.source_id !== sourceId);
+
+        renderDailyTables();
         applySearchFilter();
         renderHistoryTable();
         showToast('Bank expense deleted', 'success');
@@ -2939,11 +3013,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        smartPayIncomeAmount -= amount;
-        updateSmartPayIncomeDisplay();
-        row.remove();
-        if (smartPayIncomeTableBody.children.length === 0) renderSmartPayIncomeEmptyState();
-        calculateTotals();
+        allIncome = allIncome.filter(e => e.source_id !== sourceId);
+
+        renderDailyTables();
         applySearchFilter();
         renderLedgerList();
         updateLedgerDropdowns();
@@ -3040,17 +3112,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (record.sourceId) {
             await sb.from('expenses').delete().eq('source_id', record.sourceId);
             await sb.from('bank_expenses').delete().eq('source_id', record.sourceId);
-            const allRows = document.querySelectorAll('#expenseTableBody tr, #bankExpenseTableBody tr');
-            allRows.forEach(row => {
-                if (row.dataset.sourceId === record.sourceId) {
-                    const amt = parseFloat(row.dataset.amount) || 0;
-                    if (row.closest('#expenseTableBody')) { totalExpenseAmount -= amt; updateExpenseDisplays(); }
-                    else if (row.closest('#bankExpenseTableBody')) { smartPayExpenseAmount -= amt; updateSmartPayExpenseDisplay(); }
-                    row.remove();
-                }
-            });
-            if (expenseTableBody.children.length === 0) renderExpenseEmptyState();
-            if (bankExpenseTableBody.children.length === 0) renderBankExpenseEmptyState();
+
+            allExpenses = allExpenses.filter(e => e.source_id !== record.sourceId);
+            allBankExpenses = allBankExpenses.filter(e => e.source_id !== record.sourceId);
+            allIncome = allIncome.filter(e => e.source_id !== record.sourceId);
         }
 
         ledgerHistory = ledgerHistory.filter(h => String(h.id) !== String(id));
@@ -3058,30 +3123,19 @@ document.addEventListener('DOMContentLoaded', function() {
         updateLedgerDropdowns();
         populateHistoryFilter();
         renderHistoryTable();
+        renderDailyTables();
         updateMultiLedgerTotalDisplay();
-        calculateTotals();
         applySearchFilter();
         showToast('History entry deleted', 'success');
     });
 
     /* ============ DISPLAYS / CALC ============ */
-    function updateExpenseDisplays() {
-        headerTotalExpensesEl.textContent = fmtCurrency(totalExpenseAmount - smartPayExpenseAmount);
-        leftTotalExpenseDisplayEl.textContent = fmtCurrency(totalExpenseAmount);
-        updateMultiLedgerTotalDisplay();
-    }
-
     function updateMultiLedgerTotalDisplay() {
         const selected = ledgers.filter(l => multiLedgerIds.includes(l.id));
         const total = selected.reduce((sum, l) => sum + (parseFloat(l.balance) || 0), 0);
         headerMultiLedgerTotalEl.textContent = fmtCurrency(total);
         if (total < 0) headerMultiLedgerTotalEl.classList.add('negative');
         else headerMultiLedgerTotalEl.classList.remove('negative');
-    }
-
-    function updateSmartPayExpenseDisplay() { smartPayExpenseDisplayEl.textContent = fmtCurrency(smartPayExpenseAmount); }
-    function updateSmartPayIncomeDisplay() {
-        smartPayIncomeDisplayEl.textContent = fmtCurrency(smartPayIncomeAmount);
     }
 
     function calculateTotals() {
@@ -3167,18 +3221,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    /* ============ SEARCH & CURRENT DAY FILTER ============ */
+    /* ============ SEARCH ============ */
     function applySearchFilter() {
         searchTerm = searchInput.value.trim().toLowerCase();
-        const selectedDate = datePicker.value; // YYYY-MM-DD
-
         [expenseTableBody, bankExpenseTableBody, smartPayIncomeTableBody].forEach(tbody => {
             tbody.querySelectorAll('tr').forEach(row => {
                 if (row.classList.contains('empty-row')) return;
                 const text = row.textContent.toLowerCase();
-                const dateMatch = row.dataset.date === selectedDate;
-                const searchMatch = (searchTerm === '' || text.includes(searchTerm));
-                row.style.display = (dateMatch && searchMatch) ? '' : 'none';
+                row.style.display = (searchTerm === '' || text.includes(searchTerm)) ? '' : 'none';
             });
         });
     }
