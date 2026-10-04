@@ -518,7 +518,6 @@
         .history-table .balance-col { font-weight: 600; color: var(--primary-dark); }
         .history-table .action-col { width: 40px; text-align: center; }
 
-        /* Ledger History - Current Balance display */
         .history-current-balance {
             display: flex;
             justify-content: space-between;
@@ -801,10 +800,8 @@
         </div>
         <div class="header-center">
             <div class="text-red">Total Expenses : <span id="headerTotalExpenses">0.00</span></div>
-
-          <div class="multi-ledger-line">Total Savings : <span class="value" id="headerMultiLedgerTotal">0.00</span></div>
-        
-</div>
+            <div class="multi-ledger-line">Multi Ledger Total : <span class="value" id="headerMultiLedgerTotal">0.00</span></div>
+        </div>
         <div class="header-right">
             <div class="user-name" id="currentUser">USER</div>
             <div class="time-yellow" id="liveClock">--:--:-- --</div>
@@ -892,7 +889,7 @@
             <div class="panel smart-pay-panel">
                 <div class="smart-pay-header">
                     <button class="header-action-btn" id="openSmartPayIncomeModal">
-                        <span>Smart Pay Income : <span id="smartPayIncomeDisplay">0.00</span></span>
+                        <span>Income : <span id="smartPayIncomeDisplay">0.00</span></span>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     </button>
                 </div>
@@ -990,9 +987,10 @@
 
 <div class="modal-overlay" id="smartPayIncomeModal">
     <div class="modal-content">
-        <div class="modal-header"><h3>Smart Pay Income Entry</h3><button class="modal-close" id="closeSmartPayIncomeModal">&times;</button></div>
+        <div class="modal-header"><h3>Income Entry</h3><button class="modal-close" id="closeSmartPayIncomeModal">&times;</button></div>
         <div class="modal-body">
-            <div class="modal-form-group"><label for="smartPayInvoice">Invoice</label><input type="text" id="smartPayInvoice" placeholder="e.g., INV-001"></div>
+            <div class="modal-form-group"><label for="smartPayInvoice">Invoice / Particular</label><input type="text" id="smartPayInvoice" placeholder="e.g., INV-001"></div>
+            <div class="modal-form-group"><label for="incomeLedger">Ledger (Credit To)</label><select id="incomeLedger"></select></div>
             <div class="modal-form-group"><label for="smartPayIncomeAmount">Amount</label><input type="number" id="smartPayIncomeAmount" placeholder="0.00"></div>
         </div>
         <div class="modal-footer">
@@ -1404,6 +1402,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const submitSmartPayIncomeBtn = document.getElementById('submitSmartPayIncome');
     const smartPayInvoiceInput = document.getElementById('smartPayInvoice');
     const smartPayIncomeAmountInput = document.getElementById('smartPayIncomeAmount');
+    const incomeLedgerSelect = document.getElementById('incomeLedger');
 
     const ledgerModal = document.getElementById('ledgerModal');
     const openLedgerModalBtn = document.getElementById('openLedgerModal');
@@ -1787,10 +1786,23 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') { e.preventDefault(); submitBankExpenseBtn.click(); }
     });
 
-    openSmartPayIncomeModalBtn.addEventListener('click', () => { openModal(smartPayIncomeModal); smartPayInvoiceInput.focus(); });
+    openSmartPayIncomeModalBtn.addEventListener('click', () => {
+        updateLedgerDropdowns();
+        openModal(smartPayIncomeModal);
+        smartPayInvoiceInput.focus();
+    });
     closeSmartPayIncomeModalBtn.addEventListener('click', () => closeModal(smartPayIncomeModal));
     cancelSmartPayIncomeBtn.addEventListener('click', () => closeModal(smartPayIncomeModal));
     smartPayIncomeModal.addEventListener('click', e => { if (e.target === smartPayIncomeModal) closeModal(smartPayIncomeModal); });
+    smartPayInvoiceInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); incomeLedgerSelect.focus(); }
+    });
+    incomeLedgerSelect.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); smartPayIncomeAmountInput.focus(); smartPayIncomeAmountInput.select(); }
+    });
+    smartPayIncomeAmountInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); submitSmartPayIncomeBtn.click(); }
+    });
 
     openLedgerModalBtn.addEventListener('click', () => { openModal(ledgerModal); ledgerNameInput.focus(); });
     closeLedgerModalBtn.addEventListener('click', () => closeModal(ledgerModal));
@@ -2225,6 +2237,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateLedgerDropdowns() {
         expenseLedgerSelect.innerHTML = '';
         bankExpenseLedgerSelect.innerHTML = '';
+        incomeLedgerSelect.innerHTML = '';
+
         const availableLedgers = ledgers.filter(l => l.name !== SMART_PAY_LEDGER_NAME);
         if (availableLedgers.length === 0) {
             const p = document.createElement('option');
@@ -2236,6 +2250,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 const o1 = document.createElement('option'); o1.value = l.name; o1.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
                 expenseLedgerSelect.appendChild(o1);
                 bankExpenseLedgerSelect.appendChild(o1.cloneNode(true));
+            });
+        }
+
+        // Income dropdown lists ALL ledgers (including Smart Pay Ledger)
+        if (ledgers.length === 0) {
+            const p = document.createElement('option');
+            p.value=''; p.textContent='-- No Ledgers --'; p.disabled=true; p.selected=true;
+            incomeLedgerSelect.appendChild(p);
+        } else {
+            ledgers.forEach(l => {
+                const o = document.createElement('option');
+                o.value = l.name;
+                o.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
+                incomeLedgerSelect.appendChild(o);
             });
         }
     }
@@ -2430,12 +2458,15 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     submitSmartPayIncomeBtn.addEventListener('click', async () => {
-        const invoice = smartPayInvoiceInput.value.trim() || 'Unnamed Invoice';
+        const invoice = smartPayInvoiceInput.value.trim() || 'Unnamed Income';
+        const ledgerName = incomeLedgerSelect.value;
         const amount = parseFloat(smartPayIncomeAmountInput.value) || 0;
+
+        if (!ledgerName) { showToast('Please select a ledger.', 'error'); return; }
         if (amount <= 0) { showToast('Please enter a valid amount.', 'error'); return; }
 
-        const spLedger = await ensureSmartPayLedger();
-        if (!spLedger) { showToast('Failed to access Smart Pay Ledger', 'error'); return; }
+        const ledger = ledgers.find(l => l.name === ledgerName);
+        if (!ledger) { showToast('Ledger not found.', 'error'); return; }
 
         const sourceId = 'inc-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
 
@@ -2444,7 +2475,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
-        await creditToLedger(SMART_PAY_LEDGER_NAME, amount, invoice, 'Smart Pay Income', sourceId);
+        await creditToLedger(ledgerName, amount, invoice, 'Income', sourceId);
 
         addIncomeRow(invoice, amount, sourceId);
         smartPayIncomeAmount += amount;
@@ -2453,7 +2484,7 @@ document.addEventListener('DOMContentLoaded', function() {
         applySearchFilter();
         smartPayInvoiceInput.value = ''; smartPayIncomeAmountInput.value = '';
         closeModal(smartPayIncomeModal);
-        showToast('Income added to Smart Pay Ledger', 'success');
+        showToast(`Income added to "${ledgerName}"`, 'success');
     });
 
     submitLedgerBtn.addEventListener('click', async () => {
@@ -2665,22 +2696,29 @@ document.addEventListener('DOMContentLoaded', function() {
         const invoice = row.cells[0].textContent;
         const sourceId = row.dataset.sourceId;
 
+        // Find which ledger this income was credited to (via history record)
+        let ledgerName = SMART_PAY_LEDGER_NAME;
+        if (sourceId) {
+            const histRec = ledgerHistory.find(h => h.sourceId === sourceId);
+            if (histRec) ledgerName = histRec.ledgerName;
+        }
+
         await sb.from('smartpay_income').delete().eq('invoice', invoice).eq('amount', amount);
 
         if (sourceId) {
             await sb.from('ledger_history').delete().eq('source_id', sourceId);
         }
 
-        const spLedger = ledgers.find(l => l.name === SMART_PAY_LEDGER_NAME);
-        if (spLedger) {
-            spLedger.balance -= amount;
-            await sb.from('ledgers').update({ balance: spLedger.balance }).eq('id', spLedger.id);
+        const targetLedger = ledgers.find(l => l.name === ledgerName);
+        if (targetLedger) {
+            targetLedger.balance -= amount;
+            await sb.from('ledgers').update({ balance: targetLedger.balance }).eq('id', targetLedger.id);
             const today = new Date();
             const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
             await sb.from('ledger_history').insert({
-                user_id: currentUser.id, ledger_name: SMART_PAY_LEDGER_NAME, txn_date: dateStr,
+                user_id: currentUser.id, ledger_name: ledgerName, txn_date: dateStr,
                 caption: 'Delete: ' + invoice, txn_type: 'Reversal', amount,
-                balance_after: spLedger.balance, is_debit: true, source_id: null
+                balance_after: targetLedger.balance, is_debit: true, source_id: null
             });
         }
 
@@ -2694,7 +2732,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateLedgerDropdowns();
         updateMultiLedgerTotalDisplay();
         updateHistoryCurrentBalance(historyLedgerFilter.value);
-        showToast('Income deleted (reversed from Smart Pay Ledger)', 'success');
+        showToast(`Income deleted (reversed from "${ledgerName}")`, 'success');
     });
 
     ledgerListContainer.addEventListener('click', async (e) => {
