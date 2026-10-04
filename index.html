@@ -820,7 +820,7 @@
             <div class="panel" style="flex-grow: 1;">
                 <div class="panel-header">
                     <button class="header-action-btn" id="openExpenseModal">
-                        <span>Total Expence : <span id="leftTotalExpenseDisplay">0.00</span></span>
+                        <span>Cash Expence : <span id="leftTotalExpenseDisplay">0.00</span></span>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     </button>
                 </div>
@@ -841,7 +841,7 @@
             <div class="panel smart-pay-panel">
                 <div class="smart-pay-header">
                     <button class="header-action-btn" id="openBankExpenseModal">
-                        <span>SmartPay Expenses : <span style="color: var(--accent-red);" id="smartPayExpenseDisplay">0.00</span></span>
+                        <span>Bank Expenses : <span style="color: var(--accent-red);" id="smartPayExpenseDisplay">0.00</span></span>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     </button>
                 </div>
@@ -1548,6 +1548,8 @@ document.addEventListener('DOMContentLoaded', function() {
             connStatusEl.textContent = '● Loading…';
             await loadDailyData();
             connStatusEl.textContent = '● Online';
+            // Re-apply filters to show only current day
+            applySearchFilter();
             showToast('Loaded data for ' + datePicker.value, 'success');
         }
     });
@@ -1689,8 +1691,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e3) throw e3;
             totalExpenseAmount = 0;
             expenseTableBody.innerHTML = '';
+            // Store all expense data for filtering
             (expData || []).forEach(r => {
-                addExpenseRow(r.caption, r.ledger_name, parseFloat(r.amount)||0, r.expense_type, r.source_id);
+                addExpenseRow(r.caption, r.ledger_name, parseFloat(r.amount)||0, r.expense_type, r.source_id, r.created_at);
                 totalExpenseAmount += parseFloat(r.amount) || 0;
             });
             if ((expData||[]).length === 0) renderExpenseEmptyState();
@@ -1700,7 +1703,7 @@ document.addEventListener('DOMContentLoaded', function() {
             smartPayExpenseAmount = 0;
             bankExpenseTableBody.innerHTML = '';
             (bankData || []).forEach(r => {
-                addBankExpenseRow(r.caption, r.ledger_name, parseFloat(r.amount)||0, r.source_id);
+                addBankExpenseRow(r.caption, r.ledger_name, parseFloat(r.amount)||0, r.source_id, r.created_at);
                 smartPayExpenseAmount += parseFloat(r.amount) || 0;
             });
             if ((bankData||[]).length === 0) renderBankExpenseEmptyState();
@@ -1710,7 +1713,7 @@ document.addEventListener('DOMContentLoaded', function() {
             smartPayIncomeAmount = 0;
             smartPayIncomeTableBody.innerHTML = '';
             (incomeData || []).forEach(r => {
-                addIncomeRow(r.invoice, parseFloat(r.amount)||0, r.id);
+                addIncomeRow(r.invoice, parseFloat(r.amount)||0, r.id, r.created_at);
                 smartPayIncomeAmount += parseFloat(r.amount) || 0;
             });
             if ((incomeData||[]).length === 0) renderSmartPayIncomeEmptyState();
@@ -1755,7 +1758,7 @@ document.addEventListener('DOMContentLoaded', function() {
         ledgerListContainer.innerHTML = `<tr class="empty-row"><td colspan="4">No ledgers added yet.</td></tr>`;
     }
 
-    function addExpenseRow(caption, ledgerName, amount, type, sourceId) {
+    function addExpenseRow(caption, ledgerName, amount, type, sourceId, createdAt) {
         const emptyRow = expenseTableBody.querySelector('.empty-row');
         if (emptyRow) emptyRow.remove();
         const newRow = document.createElement('tr');
@@ -1771,10 +1774,18 @@ document.addEventListener('DOMContentLoaded', function() {
         newRow.dataset.caption = caption;
         newRow.dataset.type = type;
         newRow.dataset.sourceId = sourceId || '';
+        // Store the creation date for filtering (YYYY-MM-DD)
+        if (createdAt) {
+            const d = new Date(createdAt);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth()+1).padStart(2,'0');
+            const dd = String(d.getDate()).padStart(2,'0');
+            newRow.dataset.date = `${yyyy}-${mm}-${dd}`;
+        }
         expenseTableBody.appendChild(newRow);
     }
 
-    function addBankExpenseRow(caption, ledgerName, amount, sourceId) {
+    function addBankExpenseRow(caption, ledgerName, amount, sourceId, createdAt) {
         const emptyRow = bankExpenseTableBody.querySelector('.empty-row');
         if (emptyRow) emptyRow.remove();
         const newRow = document.createElement('tr');
@@ -1789,10 +1800,17 @@ document.addEventListener('DOMContentLoaded', function() {
         newRow.dataset.ledgerName = ledgerName;
         newRow.dataset.caption = caption;
         newRow.dataset.sourceId = sourceId || '';
+        if (createdAt) {
+            const d = new Date(createdAt);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth()+1).padStart(2,'0');
+            const dd = String(d.getDate()).padStart(2,'0');
+            newRow.dataset.date = `${yyyy}-${mm}-${dd}`;
+        }
         bankExpenseTableBody.appendChild(newRow);
     }
 
-    function addIncomeRow(invoice, amount, sourceId) {
+    function addIncomeRow(invoice, amount, sourceId, createdAt) {
         const emptyRow = smartPayIncomeTableBody.querySelector('.empty-row');
         if (emptyRow) emptyRow.remove();
         const newRow = document.createElement('tr');
@@ -1805,6 +1823,13 @@ document.addEventListener('DOMContentLoaded', function() {
             </td>`;
         newRow.dataset.amount = amount;
         newRow.dataset.sourceId = sourceId || '';
+        if (createdAt) {
+            const d = new Date(createdAt);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth()+1).padStart(2,'0');
+            const dd = String(d.getDate()).padStart(2,'0');
+            newRow.dataset.date = `${yyyy}-${mm}-${dd}`;
+        }
         smartPayIncomeTableBody.appendChild(newRow);
     }
 
@@ -2512,7 +2537,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
         await deductFromLedger(ledgerName, amount, caption, type, sourceId);
-        addExpenseRow(caption, ledgerName, amount, type, sourceId);
+        // When adding a new expense, we don't have a createdAt from DB, so we use now
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth()+1).padStart(2,'0');
+        const dd = String(now.getDate()).padStart(2,'0');
+        const todayStr = `${yyyy}-${mm}-${dd}`;
+        addExpenseRow(caption, ledgerName, amount, type, sourceId, todayStr);
         totalExpenseAmount += amount;
         updateExpenseDisplays();
         calculateTotals();
@@ -2541,7 +2572,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
         await deductFromLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
-        addBankExpenseRow(caption, ledgerName, amount, sourceId);
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth()+1).padStart(2,'0');
+        const dd = String(now.getDate()).padStart(2,'0');
+        const todayStr = `${yyyy}-${mm}-${dd}`;
+        addBankExpenseRow(caption, ledgerName, amount, sourceId, todayStr);
         smartPayExpenseAmount += amount;
         updateSmartPayExpenseDisplay();
         calculateTotals();
@@ -2571,7 +2607,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         await creditToLedger(ledgerName, amount, invoice, 'Income', sourceId);
 
-        addIncomeRow(invoice, amount, sourceId);
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth()+1).padStart(2,'0');
+        const dd = String(now.getDate()).padStart(2,'0');
+        const todayStr = `${yyyy}-${mm}-${dd}`;
+        addIncomeRow(invoice, amount, sourceId, todayStr);
         smartPayIncomeAmount += amount;
         updateSmartPayIncomeDisplay();
         calculateTotals();
@@ -3126,14 +3167,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    /* ============ SEARCH ============ */
+    /* ============ SEARCH & CURRENT DAY FILTER ============ */
     function applySearchFilter() {
         searchTerm = searchInput.value.trim().toLowerCase();
+        const selectedDate = datePicker.value; // YYYY-MM-DD
+
         [expenseTableBody, bankExpenseTableBody, smartPayIncomeTableBody].forEach(tbody => {
             tbody.querySelectorAll('tr').forEach(row => {
                 if (row.classList.contains('empty-row')) return;
                 const text = row.textContent.toLowerCase();
-                row.style.display = (searchTerm === '' || text.includes(searchTerm)) ? '' : 'none';
+                const dateMatch = row.dataset.date === selectedDate;
+                const searchMatch = (searchTerm === '' || text.includes(searchTerm));
+                row.style.display = (dateMatch && searchMatch) ? '' : 'none';
             });
         });
     }
