@@ -2141,6 +2141,7 @@ document.addEventListener('DOMContentLoaded', function() {
         printWindow.document.close();
     });
 
+    /* ============ NEW TRANSACTION MODAL ============ */
     openNewTransactionModalBtn.addEventListener('click', () => {
         txnLedgerSelect.innerHTML = '';
         if (ledgers.length === 0) {
@@ -2152,10 +2153,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 txnLedgerSelect.appendChild(o);
             });
         }
+
+        // Pre-select the ledger currently chosen in the History filter
+        const currentFilter = historyLedgerFilter.value;
+        if (currentFilter && currentFilter !== 'all') {
+            const match = [...txnLedgerSelect.options].find(o => o.value === currentFilter);
+            if (match) {
+                txnLedgerSelect.value = currentFilter;
+            }
+        }
+
         const today = new Date();
         txnDateInput.value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
         openModal(newTransactionModal);
         txnParticularInput.focus();
+        txnParticularInput.select();
     });
     closeNewTransactionModalBtn.addEventListener('click', () => closeModal(newTransactionModal));
     cancelNewTransactionBtn.addEventListener('click', () => closeModal(newTransactionModal));
@@ -2696,7 +2708,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const invoice = row.cells[0].textContent;
         const sourceId = row.dataset.sourceId;
 
-        // Find which ledger this income was credited to (via history record)
         let ledgerName = SMART_PAY_LEDGER_NAME;
         if (sourceId) {
             const histRec = ledgerHistory.find(h => h.sourceId === sourceId);
