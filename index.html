@@ -172,6 +172,24 @@
         .day-text { font-size: 18px; font-weight: 400; color: #cbd5e1; padding-left: 8px; }
         .header-center { text-align: center; font-size: 14px; line-height: 1.6; color: #94a3b8; }
         .header-center .text-red { color: var(--accent-red); font-weight: 600; }
+        .header-center .multi-ledger-line {
+            margin-top: 4px;
+            font-size: 13px;
+            color: #cbd5e1;
+            font-weight: 600;
+            letter-spacing: .3px;
+        }
+        .header-center .multi-ledger-line .value {
+            color: var(--accent-yellow);
+            font-size: 15px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 0 8px rgba(250,204,21,0.3);
+        }
+        .header-center .multi-ledger-line .value.negative {
+            color: var(--accent-red);
+            text-shadow: none;
+        }
         .header-right { text-align: right; display: flex; flex-direction: column; gap: 4px; }
         .user-name { font-size: 20px; font-weight: 600; color: #f8fafc; letter-spacing: 1px; }
         .time-yellow {
@@ -215,6 +233,7 @@
             display: flex; justify-content: space-between; align-items: center;
             background-color: #f8fafc; color: var(--text-main);
         }
+
         .header-action-btn {
             background: none; border: none; font-family: inherit;
             font-size: 15px; font-weight: 600; color: var(--text-main);
@@ -499,6 +518,35 @@
         .history-table .balance-col { font-weight: 600; color: var(--primary-dark); }
         .history-table .action-col { width: 40px; text-align: center; }
 
+        /* Ledger History - Current Balance display */
+        .history-current-balance {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: linear-gradient(135deg, var(--header-bg) 0%, #1e293b 100%);
+            color: #fff;
+            border-radius: 8px;
+            margin-top: 14px;
+            font-weight: 700;
+        }
+        .history-current-balance .label {
+            font-size: 16px;
+            letter-spacing: .8px;
+            text-transform: uppercase;
+        }
+        .history-current-balance .value {
+            color: var(--accent-yellow);
+            font-size: 32px;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 0 12px rgba(250,204,21,0.35);
+        }
+        .history-current-balance .value.negative {
+            color: var(--accent-red);
+            text-shadow: 0 0 12px rgba(239,68,68,0.35);
+        }
+
         .calculator-window {
             display: none; position: fixed; top: 100px; left: 100px;
             width: 300px; background-color: #1e293b;
@@ -734,7 +782,15 @@
         <div class="menu-item">Close</div>
         <div class="menu-item">DataBase</div>
         <div class="menu-item">Report</div>
-        <div class="menu-item">Settings</div>
+        <div class="menu-item">
+            Settings
+            <div class="sub-menu">
+                <div class="sub-menu-item" id="openProfileModal">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    Profile
+                </div>
+            </div>
+        </div>
         <div class="menu-item">Help</div>
     </div>
 
@@ -745,7 +801,10 @@
         </div>
         <div class="header-center">
             <div class="text-red">Total Expenses : <span id="headerTotalExpenses">0.00</span></div>
-        </div>
+
+          <div class="multi-ledger-line">Total Savings : <span class="value" id="headerMultiLedgerTotal">0.00</span></div>
+        
+</div>
         <div class="header-right">
             <div class="user-name" id="currentUser">USER</div>
             <div class="time-yellow" id="liveClock">--:--:-- --</div>
@@ -850,7 +909,6 @@
                         </table>
                     </div>
                 </div>
-                <div class="smart-pay-footer">Smart Pay Balance : <span id="smartPayBalanceDisplay">0.00</span></div>
             </div>
         </div>
 
@@ -1027,6 +1085,10 @@
         <div class="modal-header">
             <h3>Ledger History</h3>
             <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="modal-btn" id="printLedgerBtn" style="padding: 6px 12px; font-size: 13px; background-color: var(--accent-green); color: #fff; border: none;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                    Print
+                </button>
                 <button class="modal-btn modal-btn-submit" id="openNewTransactionModal" style="padding: 6px 12px; font-size: 13px;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     New Transaction
@@ -1034,7 +1096,7 @@
                 <button class="modal-close" id="closeLedgerHistoryModal">&times;</button>
             </div>
         </div>
-        <div class="modal-body" style="max-height: 480px;">
+        <div class="modal-body" style="max-height: 520px;">
             <div style="display: flex; gap: 12px; align-items: center;">
                 <label style="font-size: 14px; font-weight: 500; color: var(--text-muted); min-width: 100px;">Filter by Ledger:</label>
                 <select id="historyLedgerFilter" style="flex: 1; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none;">
@@ -1055,6 +1117,11 @@
                     </thead>
                     <tbody id="historyTableBody"></tbody>
                 </table>
+            </div>
+
+            <div class="history-current-balance">
+                <span class="label">Current Balance :</span>
+                <span class="value" id="historyCurrentBalanceDisplay">0.00</span>
             </div>
         </div>
         <div class="modal-footer">
@@ -1081,6 +1148,40 @@
         <div class="modal-footer">
             <button class="modal-btn modal-btn-cancel" id="cancelNewTransaction">Cancel</button>
             <button class="modal-btn modal-btn-submit" id="submitNewTransaction">Add Transaction</button>
+        </div>
+    </div>
+</div>
+
+<!-- PROFILE MODAL -->
+<div class="modal-overlay" id="profileModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Profile Settings</h3>
+            <button class="modal-close" id="closeProfileModal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Change Username</div>
+            <div class="modal-form-group">
+                <label for="profileNewName">New Username</label>
+                <input type="text" id="profileNewName" placeholder="Enter new username">
+            </div>
+            <button class="modal-btn modal-btn-submit" id="updateUsernameBtn" style="width: 100%;">Update Username</button>
+
+            <div style="height: 1px; background: var(--border-color); margin: 12px 0;"></div>
+
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Change Password</div>
+            <div class="modal-form-group">
+                <label for="profileNewPassword">New Password</label>
+                <input type="password" id="profileNewPassword" placeholder="At least 6 characters" minlength="6" autocomplete="new-password">
+            </div>
+            <div class="modal-form-group">
+                <label for="profileConfirmPassword">Confirm New Password</label>
+                <input type="password" id="profileConfirmPassword" placeholder="Re-enter new password" minlength="6" autocomplete="new-password">
+            </div>
+            <button class="modal-btn modal-btn-submit" id="updatePasswordBtn" style="width: 100%;">Update Password</button>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-cancel" id="cancelProfileModal">Close</button>
         </div>
     </div>
 </div>
@@ -1237,7 +1338,7 @@ document.addEventListener('DOMContentLoaded', function() {
             currentUser = null;
             showAuthScreen();
             ledgers = []; ledgerHistory = [];
-            multiLedgerEntries = [];
+            multiLedgerIds = [];
             totalExpenseAmount = 0; smartPayExpenseAmount = 0; smartPayIncomeAmount = 0;
             dataLoaded = false;
         }
@@ -1268,13 +1369,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const expenceInput = document.getElementById('expenceInput');
 
     const headerTotalExpensesEl = document.getElementById('headerTotalExpenses');
+    const headerMultiLedgerTotalEl = document.getElementById('headerMultiLedgerTotal');
     const leftTotalExpenseDisplayEl = document.getElementById('leftTotalExpenseDisplay');
     const expenseTableBody = document.getElementById('expenseTableBody');
     const smartPayExpenseDisplayEl = document.getElementById('smartPayExpenseDisplay');
     const bankExpenseTableBody = document.getElementById('bankExpenseTableBody');
     const smartPayIncomeDisplayEl = document.getElementById('smartPayIncomeDisplay');
     const smartPayIncomeTableBody = document.getElementById('smartPayIncomeTableBody');
-    const smartPayBalanceDisplayEl = document.getElementById('smartPayBalanceDisplay');
     const liveClockEl = document.getElementById('liveClock');
 
     const expenseModal = document.getElementById('expenseModal');
@@ -1313,7 +1414,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const ledgerOpeningBalanceInput = document.getElementById('ledgerOpeningBalance');
     const ledgerListContainer = document.getElementById('ledgerList');
 
-    // Multi Ledger modal elements
     const multiLedgerModal = document.getElementById('multiLedgerModal');
     const openMultiLedgerModalBtn = document.getElementById('openMultiLedgerModal');
     const closeMultiLedgerModalBtn = document.getElementById('closeMultiLedgerModal');
@@ -1337,6 +1437,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const closeHistoryBtn = document.getElementById('closeHistoryBtn');
     const historyLedgerFilter = document.getElementById('historyLedgerFilter');
     const historyTableBody = document.getElementById('historyTableBody');
+    const historyCurrentBalanceDisplayEl = document.getElementById('historyCurrentBalanceDisplay');
 
     const newTransactionModal = document.getElementById('newTransactionModal');
     const openNewTransactionModalBtn = document.getElementById('openNewTransactionModal');
@@ -1359,7 +1460,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let smartPayIncomeAmount = 0.00;
     let ledgers = [];
     let ledgerHistory = [];
-    let multiLedgerIds = []; // IDs of ledgers selected in Multi Ledger popup
+    let multiLedgerIds = [];
     let searchTerm = '';
     let dataLoaded = false;
 
@@ -1462,6 +1563,41 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     /* ============================================================
+       MULTI LEDGER PERSISTENCE
+       ============================================================ */
+    const MULTI_LEDGER_TABLE = 'multi_ledger_settings';
+
+    async function saveMultiLedgerSettings() {
+        if (!currentUser) return false;
+        const record = {
+            user_id: currentUser.id,
+            ledger_ids: multiLedgerIds
+        };
+        const { error } = await sb.from(MULTI_LEDGER_TABLE).upsert(record, {
+            onConflict: 'user_id'
+        });
+        if (error) { console.error('Save multi-ledger error:', error); return false; }
+        return true;
+    }
+
+    async function loadMultiLedgerSettings() {
+        if (!currentUser) return;
+        const { data, error } = await sb.from(MULTI_LEDGER_TABLE)
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .maybeSingle();
+
+        if (error) { console.error('Load multi-ledger error:', error); return; }
+        if (!data || !Array.isArray(data.ledger_ids)) {
+            multiLedgerIds = [];
+            return;
+        }
+
+        const validIds = new Set(ledgers.map(l => l.id));
+        multiLedgerIds = data.ledger_ids.filter(id => validIds.has(id));
+    }
+
+    /* ============================================================
        SUPABASE DATA LOADING
        ============================================================ */
     async function ensureSmartPayLedger() {
@@ -1532,12 +1668,15 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             if ((incomeData||[]).length === 0) renderSmartPayIncomeEmptyState();
 
+            await loadMultiLedgerSettings();
+
             renderLedgerList();
             updateLedgerDropdowns();
             populateHistoryFilter();
             updateExpenseDisplays();
             updateSmartPayExpenseDisplay();
             updateSmartPayIncomeDisplay();
+            updateMultiLedgerTotalDisplay();
             calculateTotals();
             applySearchFilter();
 
@@ -1662,7 +1801,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function populateMultiLedgerSelect() {
         const cur = multiLedgerSelect.value;
         multiLedgerSelect.innerHTML = '';
-        // List all ledgers NOT already selected
         const available = ledgers.filter(l => !multiLedgerIds.includes(l.id));
         if (available.length === 0) {
             const o = document.createElement('option');
@@ -1687,6 +1825,7 @@ document.addEventListener('DOMContentLoaded', function() {
             multiLedgerBalanceBody.innerHTML = `<tr class="empty-row"><td colspan="4">No ledgers selected yet. Use the combo box above.</td></tr>`;
             multiLedgerTotalBalanceEl.textContent = fmtCurrency(0);
             multiLedgerTotalBalanceEl.classList.remove('negative');
+            updateMultiLedgerTotalDisplay();
             return;
         }
         multiLedgerBalanceBody.innerHTML = '';
@@ -1712,9 +1851,10 @@ document.addEventListener('DOMContentLoaded', function() {
         multiLedgerTotalBalanceEl.textContent = fmtCurrency(total);
         if (total < 0) multiLedgerTotalBalanceEl.classList.add('negative');
         else multiLedgerTotalBalanceEl.classList.remove('negative');
+        updateMultiLedgerTotalDisplay();
     }
 
-    function addMultiLedgerEntry() {
+    async function addMultiLedgerEntry() {
         const id = multiLedgerSelect.value;
         if (!id) { showToast('Please select a ledger.', 'error'); return; }
         if (multiLedgerIds.includes(id)) { showToast('This ledger is already added.', 'error'); return; }
@@ -1723,19 +1863,20 @@ document.addEventListener('DOMContentLoaded', function() {
         populateMultiLedgerSelect();
         renderMultiLedgerBalances();
         const l = ledgers.find(x => x.id === id);
+        await saveMultiLedgerSettings();
         showToast(`Added "${l ? l.name : ''}" to Multi Ledger`, 'success');
     }
 
     multiLedgerAddBtn.addEventListener('click', addMultiLedgerEntry);
 
-    // Remove entry from Multi Ledger
-    multiLedgerBalanceBody.addEventListener('click', e => {
+    multiLedgerBalanceBody.addEventListener('click', async e => {
         const btn = e.target.closest('button[data-ml-id]');
         if (!btn) return;
         const id = btn.dataset.mlId;
         multiLedgerIds = multiLedgerIds.filter(x => x !== id);
         populateMultiLedgerSelect();
         renderMultiLedgerBalances();
+        await saveMultiLedgerSettings();
         showToast('Ledger removed', 'success');
     });
 
@@ -1771,6 +1912,223 @@ document.addEventListener('DOMContentLoaded', function() {
 
     historyLedgerFilter.addEventListener('change', renderHistoryTable);
 
+    /* ============ PRINT LEDGER TRANSACTIONS ============ */
+    document.getElementById('printLedgerBtn').addEventListener('click', () => {
+        const filter = historyLedgerFilter.value;
+        const filtered = filter === 'all'
+            ? ledgerHistory
+            : ledgerHistory.filter(h => h.ledgerName === filter);
+
+        if (filtered.length === 0) {
+            showToast('No transactions to print.', 'error');
+            return;
+        }
+
+        const filterLabel = filter === 'all' ? 'All Ledgers' : filter;
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-US', {
+            year: 'numeric', month: 'long', day: 'numeric'
+        });
+        const timeStr = now.toLocaleTimeString('en-US', {
+            hour: '2-digit', minute: '2-digit'
+        });
+
+        let totalDebit = 0, totalCredit = 0;
+        let rowsHtml = '';
+        filtered.forEach((record, i) => {
+            const debit = record.isDebit ? record.amount : 0;
+            const credit = !record.isDebit ? record.amount : 0;
+            totalDebit += debit;
+            totalCredit += credit;
+            rowsHtml += `
+                <tr>
+                    <td style="text-align:center;">${i + 1}</td>
+                    <td>${record.date}</td>
+                    <td>${record.caption} <span style="color:#64748b; font-size:11px;">(${record.ledgerName})</span></td>
+                    <td style="text-align:right; color:#dc2626;">${debit ? fmtCurrency(debit) : ''}</td>
+                    <td style="text-align:right; color:#059669;">${credit ? fmtCurrency(credit) : ''}</td>
+                    <td style="text-align:right; font-weight:600;">${fmtCurrency(record.balanceAfter)}</td>
+                </tr>`;
+        });
+
+        const printWindow = window.open('', '_blank', 'width=900,height=700');
+        if (!printWindow) {
+            showToast('Please allow pop-ups to print.', 'error');
+            return;
+        }
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Ledger Transactions - ${filterLabel}</title>
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body {
+                        font-family: 'Inter', Arial, sans-serif;
+                        padding: 24px;
+                        color: #1e293b;
+                        background: #fff;
+                    }
+                    .print-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-start;
+                        border-bottom: 3px solid #0f172a;
+                        padding-bottom: 14px;
+                        margin-bottom: 20px;
+                    }
+                    .print-header h1 {
+                        font-size: 22px;
+                        color: #0f172a;
+                        margin-bottom: 4px;
+                    }
+                    .print-header .subtitle {
+                        font-size: 13px;
+                        color: #64748b;
+                    }
+                    .print-header .meta {
+                        text-align: right;
+                        font-size: 12px;
+                        color: #64748b;
+                        line-height: 1.6;
+                    }
+                    .filter-info {
+                        font-size: 14px;
+                        font-weight: 600;
+                        margin-bottom: 14px;
+                        padding: 10px 14px;
+                        background: #f1f5f9;
+                        border-left: 4px solid #0f172a;
+                        border-radius: 4px;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 12px;
+                    }
+                    th {
+                        background: #0f172a;
+                        color: #fff;
+                        text-align: left;
+                        padding: 10px 8px;
+                        font-weight: 600;
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: .4px;
+                    }
+                    td {
+                        padding: 8px;
+                        border-bottom: 1px solid #e2e8f0;
+                        vertical-align: top;
+                    }
+                    tbody tr:nth-child(even) { background: #f8fafc; }
+                    tfoot td {
+                        padding: 12px 8px;
+                        font-weight: 700;
+                        background: #f1f5f9;
+                        border-top: 2px solid #0f172a;
+                        border-bottom: none;
+                        font-size: 13px;
+                    }
+                    .summary {
+                        display: flex;
+                        justify-content: flex-end;
+                        gap: 30px;
+                        margin-top: 18px;
+                        padding-top: 14px;
+                        border-top: 1px solid #cbd5e1;
+                        font-size: 13px;
+                    }
+                    .summary .item { text-align: right; }
+                    .summary .label { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+                    .summary .value { font-size: 16px; font-weight: 700; color: #0f172a; }
+                    .summary .value.debit { color: #dc2626; }
+                    .summary .value.credit { color: #059669; }
+                    .print-footer {
+                        margin-top: 30px;
+                        padding-top: 12px;
+                        border-top: 1px solid #e2e8f0;
+                        font-size: 11px;
+                        color: #94a3b8;
+                        text-align: center;
+                    }
+                    @media print {
+                        body { padding: 12px; }
+                        .print-header { border-bottom-width: 2px; }
+                        th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        tbody tr:nth-child(even) { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <div>
+                        <h1>Ledger Transactions</h1>
+                        <div class="subtitle">Blue Light Finance Pro</div>
+                    </div>
+                    <div class="meta">
+                        <div><strong>Printed:</strong> ${dateStr}</div>
+                        <div><strong>Time:</strong> ${timeStr}</div>
+                        <div><strong>Total Records:</strong> ${filtered.length}</div>
+                    </div>
+                </div>
+
+                <div class="filter-info">Ledger Filter: ${filterLabel}</div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:40px; text-align:center;">No.</th>
+                            <th style="width:100px;">Date</th>
+                            <th>Particular</th>
+                            <th style="width:110px; text-align:right;">Debit</th>
+                            <th style="width:110px; text-align:right;">Credit</th>
+                            <th style="width:120px; text-align:right;">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" style="text-align:right;">TOTALS</td>
+                            <td style="text-align:right; color:#dc2626;">${fmtCurrency(totalDebit)}</td>
+                            <td style="text-align:right; color:#059669;">${fmtCurrency(totalCredit)}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div class="summary">
+                    <div class="item">
+                        <div class="label">Total Debit</div>
+                        <div class="value debit">${fmtCurrency(totalDebit)}</div>
+                    </div>
+                    <div class="item">
+                        <div class="label">Total Credit</div>
+                        <div class="value credit">${fmtCurrency(totalCredit)}</div>
+                    </div>
+                    <div class="item">
+                        <div class="label">Net Difference</div>
+                        <div class="value">${fmtCurrency(totalCredit - totalDebit)}</div>
+                    </div>
+                </div>
+
+                <div class="print-footer">
+                    Generated by Blue Light Finance Pro &middot; ${dateStr} ${timeStr}
+                </div>
+
+                <script>
+                    window.onload = function() {
+                        setTimeout(function() { window.print(); }, 250);
+                    };
+                <\/script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    });
+
     openNewTransactionModalBtn.addEventListener('click', () => {
         txnLedgerSelect.innerHTML = '';
         if (ledgers.length === 0) {
@@ -1790,6 +2148,78 @@ document.addEventListener('DOMContentLoaded', function() {
     closeNewTransactionModalBtn.addEventListener('click', () => closeModal(newTransactionModal));
     cancelNewTransactionBtn.addEventListener('click', () => closeModal(newTransactionModal));
     newTransactionModal.addEventListener('click', e => { if (e.target === newTransactionModal) closeModal(newTransactionModal); });
+
+    /* ============ PROFILE MODAL ============ */
+    const profileModal = document.getElementById('profileModal');
+    const openProfileModalBtn = document.getElementById('openProfileModal');
+    const closeProfileModalBtn = document.getElementById('closeProfileModal');
+    const cancelProfileModalBtn = document.getElementById('cancelProfileModal');
+    const profileNewNameInput = document.getElementById('profileNewName');
+    const profileNewPasswordInput = document.getElementById('profileNewPassword');
+    const profileConfirmPasswordInput = document.getElementById('profileConfirmPassword');
+    const updateUsernameBtn = document.getElementById('updateUsernameBtn');
+    const updatePasswordBtn = document.getElementById('updatePasswordBtn');
+
+    openProfileModalBtn.addEventListener('click', () => {
+        profileNewNameInput.value = currentUser?.user_metadata?.username || '';
+        profileNewPasswordInput.value = '';
+        profileConfirmPasswordInput.value = '';
+        openModal(profileModal);
+        profileNewNameInput.focus();
+        profileNewNameInput.select();
+    });
+    closeProfileModalBtn.addEventListener('click', () => closeModal(profileModal));
+    cancelProfileModalBtn.addEventListener('click', () => closeModal(profileModal));
+    profileModal.addEventListener('click', e => { if (e.target === profileModal) closeModal(profileModal); });
+
+    updateUsernameBtn.addEventListener('click', async () => {
+        const newName = profileNewNameInput.value.trim();
+        if (!newName) { showToast('Please enter a new username.', 'error'); return; }
+        if (newName.length < 3) { showToast('Username must be at least 3 characters.', 'error'); return; }
+
+        updateUsernameBtn.disabled = true;
+        const { data, error } = await sb.auth.updateUser({
+            data: { username: newName }
+        });
+        updateUsernameBtn.disabled = false;
+
+        if (error) { showToast('Error: ' + error.message, 'error'); return; }
+
+        currentUser = data.user;
+        currentUserEl.textContent = newName.toUpperCase();
+        closeModal(profileModal);
+        showToast('Username updated successfully', 'success');
+    });
+
+    updatePasswordBtn.addEventListener('click', async () => {
+        const newPass = profileNewPasswordInput.value;
+        const confirmPass = profileConfirmPasswordInput.value;
+
+        if (!newPass || !confirmPass) { showToast('Please fill in both password fields.', 'error'); return; }
+        if (newPass.length < 6) { showToast('Password must be at least 6 characters.', 'error'); return; }
+        if (newPass !== confirmPass) { showToast('Passwords do not match.', 'error'); return; }
+
+        updatePasswordBtn.disabled = true;
+        const { error } = await sb.auth.updateUser({ password: newPass });
+        updatePasswordBtn.disabled = false;
+
+        if (error) { showToast('Error: ' + error.message, 'error'); return; }
+
+        profileNewPasswordInput.value = '';
+        profileConfirmPasswordInput.value = '';
+        closeModal(profileModal);
+        showToast('Password updated successfully', 'success');
+    });
+
+    profileNewNameInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); updateUsernameBtn.click(); }
+    });
+    profileNewPasswordInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); profileConfirmPasswordInput.focus(); }
+    });
+    profileConfirmPasswordInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); updatePasswordBtn.click(); }
+    });
 
     /* ============ LEDGER DROPDOWNS ============ */
     function updateLedgerDropdowns() {
@@ -1823,6 +2253,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderHistoryTable() {
         const filter = historyLedgerFilter.value;
         let filtered = filter === 'all' ? ledgerHistory : ledgerHistory.filter(h => h.ledgerName === filter);
+
+        updateHistoryCurrentBalance(filter);
+
         if (filtered.length === 0) {
             historyTableBody.innerHTML = `<tr class="empty-row"><td colspan="6">No history records found.</td></tr>`;
             return;
@@ -1846,6 +2279,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 </td>`;
             historyTableBody.appendChild(row);
         });
+    }
+
+    function updateHistoryCurrentBalance(filter) {
+        let balance = 0;
+        if (filter === 'all') {
+            balance = ledgers.reduce((sum, l) => sum + (parseFloat(l.balance) || 0), 0);
+        } else {
+            const ledger = ledgers.find(l => l.name === filter);
+            balance = ledger ? (parseFloat(ledger.balance) || 0) : 0;
+        }
+        historyCurrentBalanceDisplayEl.textContent = fmtCurrency(balance);
+        if (balance < 0) historyCurrentBalanceDisplayEl.classList.add('negative');
+        else historyCurrentBalanceDisplayEl.classList.remove('negative');
     }
 
     function renderLedgerList() {
@@ -1893,6 +2339,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         renderLedgerList();
         updateLedgerDropdowns();
+        updateMultiLedgerTotalDisplay();
+        updateHistoryCurrentBalance(historyLedgerFilter.value);
     }
 
     async function creditToLedger(ledgerName, amount, caption, type, sourceId) {
@@ -1916,6 +2364,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         renderLedgerList();
         updateLedgerDropdowns();
+        updateMultiLedgerTotalDisplay();
+        updateHistoryCurrentBalance(historyLedgerFilter.value);
     }
 
     /* ============ SUBMIT HANDLERS ============ */
@@ -2038,6 +2488,8 @@ document.addEventListener('DOMContentLoaded', function() {
         renderLedgerList();
         updateLedgerDropdowns();
         populateHistoryFilter();
+        updateMultiLedgerTotalDisplay();
+        updateHistoryCurrentBalance(historyLedgerFilter.value);
         ledgerNameInput.value = ''; ledgerOpeningBalanceInput.value = '';
         ledgerNameInput.focus();
         showToast('Ledger created', 'success');
@@ -2106,6 +2558,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateLedgerDropdowns();
         populateHistoryFilter();
         renderHistoryTable();
+        updateMultiLedgerTotalDisplay();
         calculateTotals();
 
         editingLedgerId = null;
@@ -2149,6 +2602,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateLedgerDropdowns();
         populateHistoryFilter();
         renderHistoryTable();
+        updateMultiLedgerTotalDisplay();
         txnParticularInput.value = ''; txnAmountInput.value = '';
         closeModal(newTransactionModal);
         showToast('Transaction added', 'success');
@@ -2238,6 +2692,8 @@ document.addEventListener('DOMContentLoaded', function() {
         applySearchFilter();
         renderLedgerList();
         updateLedgerDropdowns();
+        updateMultiLedgerTotalDisplay();
+        updateHistoryCurrentBalance(historyLedgerFilter.value);
         showToast('Income deleted (reversed from Smart Pay Ledger)', 'success');
     });
 
@@ -2268,12 +2724,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
             ledgers = ledgers.filter(l => l.id !== ledgerId);
             ledgerHistory = ledgerHistory.filter(h => h.ledgerName !== ledgerName);
+
+            const hadInMulti = multiLedgerIds.includes(ledgerId);
             multiLedgerIds = multiLedgerIds.filter(id => id !== ledgerId);
+            if (hadInMulti) await saveMultiLedgerSettings();
 
             renderLedgerList();
             updateLedgerDropdowns();
             populateHistoryFilter();
             renderHistoryTable();
+            updateMultiLedgerTotalDisplay();
             showToast('Ledger deleted', 'success');
         }
     });
@@ -2314,6 +2774,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateLedgerDropdowns();
         populateHistoryFilter();
         renderHistoryTable();
+        updateMultiLedgerTotalDisplay();
         calculateTotals();
         applySearchFilter();
         showToast('History entry deleted', 'success');
@@ -2323,11 +2784,20 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateExpenseDisplays() {
         headerTotalExpensesEl.textContent = fmtCurrency(totalExpenseAmount - smartPayExpenseAmount);
         leftTotalExpenseDisplayEl.textContent = fmtCurrency(totalExpenseAmount);
+        updateMultiLedgerTotalDisplay();
     }
+
+    function updateMultiLedgerTotalDisplay() {
+        const selected = ledgers.filter(l => multiLedgerIds.includes(l.id));
+        const total = selected.reduce((sum, l) => sum + (parseFloat(l.balance) || 0), 0);
+        headerMultiLedgerTotalEl.textContent = fmtCurrency(total);
+        if (total < 0) headerMultiLedgerTotalEl.classList.add('negative');
+        else headerMultiLedgerTotalEl.classList.remove('negative');
+    }
+
     function updateSmartPayExpenseDisplay() { smartPayExpenseDisplayEl.textContent = fmtCurrency(smartPayExpenseAmount); }
     function updateSmartPayIncomeDisplay() {
         smartPayIncomeDisplayEl.textContent = fmtCurrency(smartPayIncomeAmount);
-        smartPayBalanceDisplayEl.textContent = fmtCurrency(smartPayIncomeAmount - smartPayExpenseAmount);
     }
 
     function calculateTotals() {
@@ -2346,8 +2816,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const others = parseFloat(othersInput.value) || 0;
         totalBillInput.value = fmtCurrency(opening + others);
 
-        const combined = totalExpenseAmount + smartPayExpenseAmount;
-        const result = (opening + others) - combined - grandTotal + smartPayIncomeAmount;
+        const result = (opening + others) - totalExpenseAmount - grandTotal + smartPayIncomeAmount;
         if (Math.abs(result) < 0.001) {
             shiftCashResultEl.textContent = 'Tally';
             shiftCashResultEl.classList.add('tally');
@@ -2504,7 +2973,6 @@ document.addEventListener('DOMContentLoaded', function() {
     updateCalcDisplay();
     calculateTotals();
 
-    // Placeholder empty states
     renderExpenseEmptyState();
     renderBankExpenseEmptyState();
     renderSmartPayIncomeEmptyState();
