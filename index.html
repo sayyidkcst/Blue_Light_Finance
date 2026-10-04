@@ -783,7 +783,19 @@
                 </div>
             </div>
         </div>
-        <div class="menu-item">Close</div>
+        <div class="menu-item">
+            Close
+            <div class="sub-menu">
+                <div class="sub-menu-item" id="closeMenuSaveChanges">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    Save Changes
+                </div>
+                <div class="sub-menu-item" id="closeMenuExit">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    Exit
+                </div>
+            </div>
+        </div>
         <div class="menu-item">DataBase</div>
         <div class="menu-item">Report</div>
         <div class="menu-item">
@@ -1521,6 +1533,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const SMART_PAY_LEDGER_NAME = 'Smart Pay Ledger';
 
+    /* ============ AUTO-SAVE DEBOUNCE ============ */
+    let autoSaveTimer = null;
+    function scheduleAutoSave() {
+        if (!currentUser) return;
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(async () => {
+            const saved = await saveDailyData();
+            if (saved) {
+                connStatusEl.textContent = '● Auto-saved';
+                connStatusEl.classList.add('online');
+                setTimeout(() => {
+                    if (connStatusEl.textContent === '● Auto-saved') {
+                        connStatusEl.textContent = '● Online';
+                    }
+                }, 1200);
+            }
+        }, 700);
+    }
+
     /* ============ LIVE CLOCK ============ */
     function updateClock() {
         const now = new Date();
@@ -1556,7 +1587,6 @@ document.addEventListener('DOMContentLoaded', function() {
             connStatusEl.textContent = '● Loading…';
             await loadDailyData();
             connStatusEl.textContent = '● Online';
-            // Re-render tables and recalculate totals for the selected date
             renderDailyTables();
             applySearchFilter();
             showToast('Loaded data for ' + datePicker.value, 'success');
@@ -1746,7 +1776,6 @@ document.addEventListener('DOMContentLoaded', function() {
             updateMultiLedgerTotalDisplay();
             calculateTotals();
 
-            // Render tables for the currently selected date
             renderDailyTables();
 
             await loadDailyData();
@@ -3154,7 +3183,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const others = parseFloat(othersInput.value) || 0;
         totalBillInput.value = fmtCurrency(opening + others);
 
-        const result = (opening + others) - totalExpenseAmount - grandTotal + smartPayIncomeAmount;
+        // SHIFT CASH RESULT: Total Bill − Cash Expense − Cash Count Total (grandTotal)
+        const result = (opening + others) - totalExpenseAmount - grandTotal;
         if (Math.abs(result) < 0.001) {
             shiftCashResultEl.textContent = 'Tally';
             shiftCashResultEl.classList.add('tally');
@@ -3165,13 +3195,16 @@ document.addEventListener('DOMContentLoaded', function() {
         expenceInput.value = fmtCurrency(totalExpenseAmount);
     }
 
-    denomInputs.forEach(i => { i.addEventListener('input', calculateTotals); i.addEventListener('change', calculateTotals); });
-    openingInput.addEventListener('input', calculateTotals);
-    othersInput.addEventListener('input', calculateTotals);
+    denomInputs.forEach(i => {
+        i.addEventListener('input', () => { calculateTotals(); scheduleAutoSave(); });
+        i.addEventListener('change', () => { calculateTotals(); scheduleAutoSave(); });
+    });
+    openingInput.addEventListener('input', () => { calculateTotals(); scheduleAutoSave(); });
+    othersInput.addEventListener('input', () => { calculateTotals(); scheduleAutoSave(); });
 
     clearOpeningBtn.addEventListener('click', () => {
         openingInput.value = ''; othersInput.value = '';
-        calculateTotals(); openingInput.focus();
+        calculateTotals(); scheduleAutoSave(); openingInput.focus();
     });
     openingInput.addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); othersInput.focus(); othersInput.select(); }
@@ -3194,6 +3227,7 @@ document.addEventListener('DOMContentLoaded', function() {
         totalCashInput.value = '0.00';
         document.querySelectorAll('.row-total').forEach(el => el.textContent = '0.00');
         calculateTotals();
+        scheduleAutoSave();
     });
 
     /* ============ SAVE CHANGES ============ */
@@ -3219,6 +3253,30 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (err) {
             showToast('Error: ' + err.message, 'error');
         }
+    });
+
+    /* ============ CLOSE MENU SAVE CHANGES ============ */
+    document.getElementById('closeMenuSaveChanges').addEventListener('click', async () => {
+        if (!currentUser) { showToast('Not logged in.', 'error'); return; }
+        try {
+            const saved = await saveDailyData();
+            if (saved) {
+                calculateTotals();
+                showToast('Daily data saved to database', 'success');
+            } else {
+                showToast('Error saving to database', 'error');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    });
+
+    document.getElementById('closeMenuExit').addEventListener('click', async () => {
+        if (!currentUser) return;
+        try {
+            await saveDailyData();
+        } catch (e) { /* ignore */ }
+        await sb.auth.signOut();
     });
 
     /* ============ SEARCH ============ */
