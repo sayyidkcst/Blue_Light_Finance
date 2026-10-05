@@ -773,6 +773,10 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="8" height="16" rx="1"></rect><rect x="14" y="4" width="8" height="16" rx="1"></rect></svg>
                     Multi Ledger
                 </div>
+                <div class="sub-menu-item" id="openLedgerTransferModal">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+                    Ledger Transfer
+                </div>
                 <div class="sub-menu-item" id="openLedgerHistoryModal">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                     Ledger History
@@ -1034,6 +1038,48 @@
         <div class="modal-footer">
             <button class="modal-btn modal-btn-cancel" id="cancelLedger">Cancel</button>
             <button class="modal-btn modal-btn-submit" id="submitLedger">Add Ledger</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ LEDGER TRANSFER MODAL ============ -->
+<div class="modal-overlay" id="ledgerTransferModal">
+    <div class="modal-content" style="width: 500px;">
+        <div class="modal-header"><h3>Ledger to Ledger Transfer</h3><button class="modal-close" id="closeLedgerTransferModal">&times;</button></div>
+        <div class="modal-body">
+            <div class="modal-form-group">
+                <label for="transferFromLedger">From Ledger (Debit)</label>
+                <select id="transferFromLedger"></select>
+            </div>
+            <div style="display: flex; justify-content: center; align-items: center; padding: 4px 0;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+            </div>
+            <div class="modal-form-group">
+                <label for="transferToLedger">To Ledger (Credit)</label>
+                <select id="transferToLedger"></select>
+            </div>
+            <div class="modal-form-group">
+                <label for="transferAmount">Amount</label>
+                <input type="number" id="transferAmount" placeholder="0.00" min="0.01">
+            </div>
+            <div class="modal-form-group">
+                <label for="transferCaption">Note / Particular</label>
+                <input type="text" id="transferCaption" placeholder="e.g., Cash deposit to bank" value="Ledger Transfer">
+            </div>
+            <div id="transferPreview" style="display: none; padding: 12px 16px; background: #f1f5f9; border-radius: 8px; font-size: 14px; line-height: 1.6; color: var(--text-muted);">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>From <strong id="previewFromName">—</strong> balance:</span>
+                    <span id="previewFromBalance" style="font-weight: 600; color: var(--primary-dark);">0.00</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span>To <strong id="previewToName">—</strong> balance:</span>
+                    <span id="previewToBalance" style="font-weight: 600; color: var(--primary-dark);">0.00</span>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-cancel" id="cancelLedgerTransfer">Cancel</button>
+            <button class="modal-btn modal-btn-submit" id="submitLedgerTransfer">Transfer</button>
         </div>
     </div>
 </div>
@@ -1462,6 +1508,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const ledgerNameInput = document.getElementById('ledgerName');
     const ledgerOpeningBalanceInput = document.getElementById('ledgerOpeningBalance');
     const ledgerListContainer = document.getElementById('ledgerList');
+
+    /* ============ LEDGER TRANSFER ELEMENTS ============ */
+    const ledgerTransferModal = document.getElementById('ledgerTransferModal');
+    const openLedgerTransferModalBtn = document.getElementById('openLedgerTransferModal');
+    const closeLedgerTransferModalBtn = document.getElementById('closeLedgerTransferModal');
+    const cancelLedgerTransferBtn = document.getElementById('cancelLedgerTransfer');
+    const submitLedgerTransferBtn = document.getElementById('submitLedgerTransfer');
+    const transferFromLedgerSelect = document.getElementById('transferFromLedger');
+    const transferToLedgerSelect = document.getElementById('transferToLedger');
+    const transferAmountInput = document.getElementById('transferAmount');
+    const transferCaptionInput = document.getElementById('transferCaption');
+    const transferPreview = document.getElementById('transferPreview');
+    const previewFromName = document.getElementById('previewFromName');
+    const previewFromBalance = document.getElementById('previewFromBalance');
+    const previewToName = document.getElementById('previewToName');
+    const previewToBalance = document.getElementById('previewToBalance');
 
     const multiLedgerModal = document.getElementById('multiLedgerModal');
     const openMultiLedgerModalBtn = document.getElementById('openMultiLedgerModal');
@@ -2082,6 +2144,95 @@ document.addEventListener('DOMContentLoaded', function() {
     closeMultiLedgerBtn.addEventListener('click', () => closeModal(multiLedgerModal));
     multiLedgerModal.addEventListener('click', e => { if (e.target === multiLedgerModal) closeModal(multiLedgerModal); });
 
+    /* ============ LEDGER TRANSFER ============ */
+    function populateTransferSelects() {
+        const fromVal = transferFromLedgerSelect.value;
+        const toVal = transferToLedgerSelect.value;
+
+        transferFromLedgerSelect.innerHTML = '';
+        transferToLedgerSelect.innerHTML = '';
+
+        if (ledgers.length === 0) {
+            const o = document.createElement('option');
+            o.value = ''; o.textContent = '-- No Ledgers --'; o.disabled = true; o.selected = true;
+            transferFromLedgerSelect.appendChild(o.cloneNode(true));
+            transferToLedgerSelect.appendChild(o);
+            return;
+        }
+
+        ledgers.forEach(l => {
+            const o1 = document.createElement('option');
+            o1.value = l.id;
+            o1.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
+            transferFromLedgerSelect.appendChild(o1);
+
+            const o2 = document.createElement('option');
+            o2.value = l.id;
+            o2.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
+            transferToLedgerSelect.appendChild(o2);
+        });
+
+        if ([...transferFromLedgerSelect.options].some(o => o.value === fromVal)) {
+            transferFromLedgerSelect.value = fromVal;
+        }
+        if ([...transferToLedgerSelect.options].some(o => o.value === toVal)) {
+            transferToLedgerSelect.value = toVal;
+        }
+
+        // Default: first for From, second for To (if available)
+        if (!fromVal && ledgers.length > 0) transferFromLedgerSelect.value = ledgers[0].id;
+        if (!toVal && ledgers.length > 1) transferToLedgerSelect.value = ledgers[1].id;
+        updateTransferPreview();
+    }
+
+    function updateTransferPreview() {
+        const fromId = transferFromLedgerSelect.value;
+        const toId = transferToLedgerSelect.value;
+        const amount = parseFloat(transferAmountInput.value) || 0;
+
+        if (!fromId || !toId) {
+            transferPreview.style.display = 'none';
+            return;
+        }
+
+        const fromLedger = ledgers.find(l => l.id === fromId);
+        const toLedger = ledgers.find(l => l.id === toId);
+
+        if (!fromLedger || !toLedger) {
+            transferPreview.style.display = 'none';
+            return;
+        }
+
+        transferPreview.style.display = 'block';
+        previewFromName.textContent = fromLedger.name;
+        previewFromBalance.textContent = fmtCurrency(fromLedger.balance) + (amount > 0 ? ` → ${fmtCurrency(fromLedger.balance - amount)}` : '');
+        previewToName.textContent = toLedger.name;
+        previewToBalance.textContent = fmtCurrency(toLedger.balance) + (amount > 0 ? ` → ${fmtCurrency(toLedger.balance + amount)}` : '');
+    }
+
+    transferFromLedgerSelect.addEventListener('change', updateTransferPreview);
+    transferToLedgerSelect.addEventListener('change', updateTransferPreview);
+    transferAmountInput.addEventListener('input', updateTransferPreview);
+
+    openLedgerTransferModalBtn.addEventListener('click', () => {
+        populateTransferSelects();
+        transferAmountInput.value = '';
+        transferCaptionInput.value = 'Ledger Transfer';
+        updateTransferPreview();
+        openModal(ledgerTransferModal);
+        transferAmountInput.focus();
+    });
+    closeLedgerTransferModalBtn.addEventListener('click', () => closeModal(ledgerTransferModal));
+    cancelLedgerTransferBtn.addEventListener('click', () => closeModal(ledgerTransferModal));
+    ledgerTransferModal.addEventListener('click', e => { if (e.target === ledgerTransferModal) closeModal(ledgerTransferModal); });
+
+    transferAmountInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); transferCaptionInput.focus(); transferCaptionInput.select(); }
+    });
+    transferCaptionInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); submitLedgerTransferBtn.click(); }
+    });
+
     /* ============ EDIT LEDGER MODAL ============ */
     closeEditLedgerModalBtn.addEventListener('click', () => closeModal(editLedgerModal));
     cancelEditLedgerBtn.addEventListener('click', () => closeModal(editLedgerModal));
@@ -2485,7 +2636,7 @@ document.addEventListener('DOMContentLoaded', function() {
         datalist.innerHTML = '';
 
         const seen = new Set();
-        const skipTypes = ['Opening', 'Reversal', 'Adjustment'];
+        const skipTypes = ['Opening', 'Reversal', 'Adjustment', 'Transfer'];
         ledgerHistory.forEach(h => {
             const caption = (h.caption || '').trim();
             if (!caption) return;
@@ -2620,6 +2771,73 @@ document.addEventListener('DOMContentLoaded', function() {
         updateMultiLedgerTotalDisplay();
         updateHistoryCurrentBalance(historyLedgerFilter.value);
     }
+
+    /* ============ LEDGER TRANSFER SUBMIT ============ */
+    submitLedgerTransferBtn.addEventListener('click', async () => {
+        const fromId = transferFromLedgerSelect.value;
+        const toId = transferToLedgerSelect.value;
+        const amount = parseFloat(transferAmountInput.value) || 0;
+        const caption = transferCaptionInput.value.trim() || 'Ledger Transfer';
+
+        if (!fromId || !toId) { showToast('Please select both ledgers.', 'error'); return; }
+        if (fromId === toId) { showToast('Cannot transfer to the same ledger.', 'error'); return; }
+        if (amount <= 0) { showToast('Please enter a valid amount.', 'error'); return; }
+
+        const fromLedger = ledgers.find(l => l.id === fromId);
+        const toLedger = ledgers.find(l => l.id === toId);
+
+        if (!fromLedger || !toLedger) { showToast('Ledger not found.', 'error'); return; }
+        if (amount > fromLedger.balance) {
+            showToast(`Insufficient balance in "${fromLedger.name}". Available: ${fmtCurrency(fromLedger.balance)}`, 'error');
+            return;
+        }
+
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+        // Deduct from source ledger
+        fromLedger.balance -= amount;
+        const { data: debitData, error: debitError } = await sb.from('ledger_history').insert({
+            user_id: currentUser.id, ledger_name: fromLedger.name, txn_date: dateStr,
+            caption: caption + ' → ' + toLedger.name, txn_type: 'Transfer',
+            amount, balance_after: fromLedger.balance, is_debit: true, source_id: null
+        }).select().single();
+
+        if (debitError) { showToast('DB error: ' + debitError.message, 'error'); return; }
+        await sb.from('ledgers').update({ balance: fromLedger.balance }).eq('id', fromLedger.id);
+        ledgerHistory.unshift({
+            id: debitData.id, date: debitData.txn_date, ledgerName: debitData.ledger_name,
+            caption: debitData.caption, type: debitData.txn_type, amount: parseFloat(debitData.amount),
+            balanceAfter: parseFloat(debitData.balance_after), isDebit: debitData.is_debit, sourceId: debitData.source_id
+        });
+
+        // Credit to destination ledger
+        toLedger.balance += amount;
+        const { data: creditData, error: creditError } = await sb.from('ledger_history').insert({
+            user_id: currentUser.id, ledger_name: toLedger.name, txn_date: dateStr,
+            caption: caption + ' ← ' + fromLedger.name, txn_type: 'Transfer',
+            amount, balance_after: toLedger.balance, is_debit: false, source_id: null
+        }).select().single();
+
+        if (creditError) { showToast('DB error: ' + creditError.message, 'error'); return; }
+        await sb.from('ledgers').update({ balance: toLedger.balance }).eq('id', toLedger.id);
+        ledgerHistory.unshift({
+            id: creditData.id, date: creditData.txn_date, ledgerName: creditData.ledger_name,
+            caption: creditData.caption, type: creditData.txn_type, amount: parseFloat(creditData.amount),
+            balanceAfter: parseFloat(creditData.balance_after), isDebit: creditData.is_debit, sourceId: creditData.source_id
+        });
+
+        renderLedgerList();
+        updateLedgerDropdowns();
+        populateHistoryFilter();
+        updateMultiLedgerTotalDisplay();
+        updateHistoryCurrentBalance(historyLedgerFilter.value);
+        populateTransferSelects();
+
+        transferAmountInput.value = '';
+        closeModal(ledgerTransferModal);
+        showToast(`Transferred ${fmtCurrency(amount)} from "${fromLedger.name}" to "${toLedger.name}"`, 'success');
+    });
 
     /* ============ SUBMIT HANDLERS ============ */
     submitExpenseBtn.addEventListener('click', async () => {
