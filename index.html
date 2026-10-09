@@ -890,7 +890,7 @@
                 <div class="form-group">
                     <label>Opening :</label>
                     <input type="number" id="openingInput" value="" placeholder="0.00">
-                    <button class="btn-icon" id="clearOpeningBtn" title="Clear Opening & Others">
+                    <button class="btn-icon" id="clearOpeningBtn" title="Load previous day's closing balance as Opening">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
                     </button>
                 </div>
@@ -3592,9 +3592,49 @@ document.addEventListener('DOMContentLoaded', function() {
     openingInput.addEventListener('input', () => { calculateTotals(); scheduleAutoSave(); });
     othersInput.addEventListener('input', () => { calculateTotals(); scheduleAutoSave(); });
 
-    clearOpeningBtn.addEventListener('click', () => {
-        openingInput.value = ''; othersInput.value = '';
-        calculateTotals(); scheduleAutoSave(); openingInput.focus();
+    clearOpeningBtn.addEventListener('click', async () => {
+        if (!currentUser) { showToast('Not logged in.', 'error'); return; }
+        const dateVal = datePicker.value;
+        if (!dateVal) { showToast('Select a date first.', 'error'); return; }
+
+        clearOpeningBtn.disabled = true;
+        try {
+            // Most recent saved day before the selected date
+            const { data, error } = await sb.from(DAILY_TABLE)
+                .select('record_date, opening, others, denominations')
+                .eq('user_id', currentUser.id)
+                .lt('record_date', dateVal)
+                .order('record_date', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (error) { console.error(error); showToast('Could not load previous closing.', 'error'); return; }
+            if (!data) { showToast('No previous day record found.', 'error'); return; }
+
+            // Closing balance = cash count total (denominations x counts) of that day
+            const denoms = data.denominations || [];
+            let closing = 0;
+            denomInputs.forEach((input, i) => {
+                closing += (parseFloat(input.getAttribute('data-currency')) || 0) * (parseFloat(denoms[i]) || 0);
+            });
+
+            // If that day's Total Cash is 0, closing = Total Bill - Expense
+            if (closing === 0) {
+                const totalBill = (parseFloat(data.opening) || 0) + (parseFloat(data.others) || 0);
+                const prevExpense = allExpenses
+                    .filter(e => e.date === data.record_date)
+                    .reduce((sum, e) => sum + e.amount, 0);
+                closing = totalBill - prevExpense;
+            }
+
+            openingInput.value = closing || '';
+            calculateTotals(); scheduleAutoSave();
+            showToast('Opening set to closing of ' + data.record_date + ': ' + fmtCurrency(closing), 'success');
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        } finally {
+            clearOpeningBtn.disabled = false;
+        }
     });
     openingInput.addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); othersInput.focus(); othersInput.select(); }
