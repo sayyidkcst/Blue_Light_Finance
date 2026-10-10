@@ -2893,13 +2893,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    /* ============ HELPER: Selected-date utilities ============ */
+    function getSelectedDateStr() {
+        if (datePicker && datePicker.value) return datePicker.value;
+        const t = new Date();
+        return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    }
+    // ISO timestamp on the selected date (keeps current local time-of-day so ordering stays natural)
+    function getSelectedDateTimeISO() {
+        const [y, m, d] = getSelectedDateStr().split('-').map(Number);
+        const n = new Date();
+        return new Date(y, m - 1, d, n.getHours(), n.getMinutes(), n.getSeconds()).toISOString();
+    }
+
     /* ============ HELPER: Ledger balance changes ============ */
     async function deductFromLedger(ledgerName, amount, caption, type, sourceId) {
         const ledger = ledgers.find(l => l.name === ledgerName);
         if (!ledger) return;
         ledger.balance -= amount;
-        const today = new Date();
-        const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        const dateStr = getSelectedDateStr();
         const histEntry = {
             user_id: currentUser.id, ledger_name: ledgerName, txn_date: dateStr,
             caption, txn_type: type, amount, balance_after: ledger.balance,
@@ -2923,8 +2935,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const ledger = ledgers.find(l => l.name === ledgerName);
         if (!ledger) return;
         ledger.balance += amount;
-        const today = new Date();
-        const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        const dateStr = getSelectedDateStr();
         const histEntry = {
             user_id: currentUser.id, ledger_name: ledgerName, txn_date: dateStr,
             caption, txn_type: type, amount, balance_after: ledger.balance,
@@ -3026,12 +3037,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (amount > ledger.balance) { showToast(`Amount exceeds balance of ${fmtCurrency(ledger.balance)}.`, 'error'); return; }
 
         const sourceId = 'exp-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
-        const now = new Date();
-        const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const todayStr = getSelectedDateStr();
+        const createdAtISO = getSelectedDateTimeISO();
 
         const { error } = await sb.from('expenses').insert({
             user_id: currentUser.id, caption, ledger_name: ledgerName,
-            amount, expense_type: type, source_id: sourceId
+            amount, expense_type: type, source_id: sourceId, created_at: createdAtISO
         });
         if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
@@ -3063,11 +3074,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (amount > ledger.balance) { showToast(`Amount exceeds balance of ${fmtCurrency(ledger.balance)}.`, 'error'); return; }
 
         const sourceId = 'bnk-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
-        const now = new Date();
-        const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const todayStr = getSelectedDateStr();
+        const createdAtISO = getSelectedDateTimeISO();
 
         const { error } = await sb.from('bank_expenses').insert({
-            user_id: currentUser.id, caption, ledger_name: ledgerName, amount, source_id: sourceId
+            user_id: currentUser.id, caption, ledger_name: ledgerName, amount, source_id: sourceId, created_at: createdAtISO
         });
         if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
@@ -3097,11 +3108,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!ledger) { showToast('Ledger not found.', 'error'); return; }
 
         const sourceId = 'inc-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
-        const now = new Date();
-        const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const todayStr = getSelectedDateStr();
+        const createdAtISO = getSelectedDateTimeISO();
 
         const { error } = await sb.from('smartpay_income').insert({
-            user_id: currentUser.id, invoice, amount
+            user_id: currentUser.id, invoice, amount, created_at: createdAtISO
         });
         if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
