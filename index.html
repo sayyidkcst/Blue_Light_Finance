@@ -2458,6 +2458,14 @@ document.addEventListener('DOMContentLoaded', function() {
             hour: '2-digit', minute: '2-digit'
         });
 
+        let finalBalance;
+        if (filter === 'all') {
+            finalBalance = ledgers.reduce((sum, l) => sum + (Number(l.balance) || 0), 0);
+        } else {
+            const lg = ledgers.find(l => l.name === filter);
+            finalBalance = lg ? Number(lg.balance) || 0 : filtered[filtered.length - 1].balanceAfter;
+        }
+
         let totalDebit = 0, totalCredit = 0;
         let rowsHtml = '';
         filtered.forEach((record, i) => {
@@ -2626,16 +2634,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 <div class="summary">
                     <div class="item">
-                        <div class="label">Total Debit</div>
-                        <div class="value debit">${fmtCurrency(totalDebit)}</div>
-                    </div>
-                    <div class="item">
-                        <div class="label">Total Credit</div>
-                        <div class="value credit">${fmtCurrency(totalCredit)}</div>
-                    </div>
-                    <div class="item">
-                        <div class="label">Net Difference</div>
-                        <div class="value">${fmtCurrency(totalCredit - totalDebit)}</div>
+                        <div class="label">Final Balance</div>
+                        <div class="value">${fmtCurrency(finalBalance)}</div>
                     </div>
                 </div>
 
