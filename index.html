@@ -997,6 +997,13 @@
                     <option value="Maintenance">Maintenance</option>
                 </select>
             </div>
+            <div class="modal-form-group">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:500;"><input type="checkbox" id="expenseDepositCheck" style="width:auto; margin:0;"> Deposit to another ledger</label>
+            </div>
+            <div class="modal-form-group" id="expenseDepositGroup" style="display:none;">
+                <label for="expenseDepositLedger">Deposit Ledger (amount will be added)</label>
+                <select id="expenseDepositLedger"></select>
+            </div>
         </div>
         <div class="modal-footer">
             <button class="modal-btn modal-btn-cancel" id="cancelExpense">Cancel</button>
@@ -1012,6 +1019,13 @@
             <div class="modal-form-group"><label for="bankExpenseCaption">Caption</label><input type="text" id="bankExpenseCaption" placeholder="e.g., Bank Charges"></div>
             <div class="modal-form-group"><label for="bankExpenseLedger">Ledger</label><select id="bankExpenseLedger"></select></div>
             <div class="modal-form-group"><label for="bankExpenseAmount">Amount</label><input type="number" id="bankExpenseAmount" placeholder="0.00"></div>
+            <div class="modal-form-group">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:500;"><input type="checkbox" id="bankExpenseDepositCheck" style="width:auto; margin:0;"> Deposit to another ledger</label>
+            </div>
+            <div class="modal-form-group" id="bankExpenseDepositGroup" style="display:none;">
+                <label for="bankExpenseDepositLedger">Deposit Ledger (amount will be added)</label>
+                <select id="bankExpenseDepositLedger"></select>
+            </div>
         </div>
         <div class="modal-footer">
             <button class="modal-btn modal-btn-cancel" id="cancelBankExpense">Cancel</button>
@@ -1366,7 +1380,7 @@
             </div>
             <div style="height: 1px; background: var(--border-color); margin: 16px 0 12px;"></div>
             <p style="font-size:13px; line-height:1.6; color:var(--text-muted);">
-                Blue Light Finance Pro is how it keeps everyday money work in one place: expenses, bank entries, ledgers, transfers and printable history all sit together, so the numbers stay clear and easy to trust.
+                What I like most about Blue Light Finance Pro is how it keeps everyday money work in one place: expenses, bank entries, ledgers, transfers and printable history all sit together, so the numbers stay clear and easy to trust.
             </p>
         </div>
         <div class="modal-footer">
@@ -1577,6 +1591,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const expenseLedgerSelect = document.getElementById('expenseLedger');
     const expenseAmountInput = document.getElementById('expenseAmount');
     const expenseTypeSelect = document.getElementById('expenseType');
+    const expenseDepositCheck = document.getElementById('expenseDepositCheck');
+    const expenseDepositGroup = document.getElementById('expenseDepositGroup');
+    const expenseDepositSelect = document.getElementById('expenseDepositLedger');
+    const bankExpenseDepositCheck = document.getElementById('bankExpenseDepositCheck');
+    const bankExpenseDepositGroup = document.getElementById('bankExpenseDepositGroup');
+    const bankExpenseDepositSelect = document.getElementById('bankExpenseDepositLedger');
+    expenseDepositCheck.addEventListener('change', () => { expenseDepositGroup.style.display = expenseDepositCheck.checked ? 'flex' : 'none'; });
+    bankExpenseDepositCheck.addEventListener('change', () => { bankExpenseDepositGroup.style.display = bankExpenseDepositCheck.checked ? 'flex' : 'none'; });
+    function resetDepositOptions() {
+        expenseDepositCheck.checked = false; expenseDepositGroup.style.display = 'none';
+        bankExpenseDepositCheck.checked = false; bankExpenseDepositGroup.style.display = 'none';
+    }
 
     const bankExpenseModal = document.getElementById('bankExpenseModal');
     const openBankExpenseModalBtn = document.getElementById('openBankExpenseModal');
@@ -2085,8 +2111,8 @@ document.addEventListener('DOMContentLoaded', function() {
         smartPayExpenseDisplayEl.textContent = fmtCurrency(dailyBankExpense);
         smartPayIncomeDisplayEl.textContent = fmtCurrency(dailyIncome);
 
-        // Header total = cash expenses for the day
-        headerTotalExpensesEl.textContent = fmtCurrency(dailyCashExpense);
+        // Header total = cash expenses + bank expenses for the day
+        headerTotalExpensesEl.textContent = fmtCurrency(dailyCashExpense + dailyBankExpense);
 
         // Update internal totals used for shift cash calculation
         totalExpenseAmount = dailyCashExpense;
@@ -2795,6 +2821,14 @@ document.addEventListener('DOMContentLoaded', function() {
         expenseLedgerSelect.innerHTML = '';
         bankExpenseLedgerSelect.innerHTML = '';
         incomeLedgerSelect.innerHTML = '';
+        expenseDepositSelect.innerHTML = '';
+        bankExpenseDepositSelect.innerHTML = '';
+        ledgers.forEach(l => {
+            const o = document.createElement('option');
+            o.value = l.name; o.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
+            expenseDepositSelect.appendChild(o);
+            bankExpenseDepositSelect.appendChild(o.cloneNode(true));
+        });
 
         const availableLedgers = ledgers.filter(l => l.name !== SMART_PAY_LEDGER_NAME);
         if (availableLedgers.length === 0) {
@@ -3055,6 +3089,19 @@ document.addEventListener('DOMContentLoaded', function() {
         showToast(`Transferred ${fmtCurrency(amount)} from "${fromLedger.name}" to "${toLedger.name}"`, 'success');
     });
 
+    /* ============ HELPER: optional deposit to another ledger ============ */
+    // Returns true if OK to proceed (no deposit requested, or deposit validated).
+    function validateDeposit(checkEl, selectEl, expenseLedgerName) {
+        if (!checkEl.checked) return true;
+        if (!selectEl.value) { showToast('Please select a deposit ledger.', 'error'); return false; }
+        if (selectEl.value === expenseLedgerName) { showToast('Deposit ledger must be different from the expense ledger.', 'error'); return false; }
+        return true;
+    }
+    async function applyDeposit(checkEl, selectEl, amount, caption, expenseLedgerName, sourceId) {
+        if (!checkEl.checked) return;
+        await creditToLedger(selectEl.value, amount, caption + ' ← ' + expenseLedgerName, 'Deposit', sourceId + '-dep');
+    }
+
     /* ============ SUBMIT HANDLERS ============ */
     submitExpenseBtn.addEventListener('click', async () => {
         const caption = expenseCaptionInput.value.trim() || 'Unnamed Expense';
@@ -3068,6 +3115,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (ledger.balance <= 0) { showToast(`Ledger "${ledgerName}" has zero balance.`, 'error'); return; }
         if (amount <= 0) { showToast('Please enter a valid amount.', 'error'); return; }
         if (amount > ledger.balance) { showToast(`Amount exceeds balance of ${fmtCurrency(ledger.balance)}.`, 'error'); return; }
+        if (!validateDeposit(expenseDepositCheck, expenseDepositSelect, ledgerName)) return;
 
         const sourceId = 'exp-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
         const todayStr = getSelectedDateStr();
@@ -3080,6 +3128,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
         await deductFromLedger(ledgerName, amount, caption, type, sourceId);
+        await applyDeposit(expenseDepositCheck, expenseDepositSelect, amount, caption, ledgerName, sourceId);
 
         allExpenses.push({
             caption, ledger_name: ledgerName, amount, expense_type: type,
@@ -3090,6 +3139,7 @@ document.addEventListener('DOMContentLoaded', function() {
         applySearchFilter();
 
         expenseCaptionInput.value = ''; expenseAmountInput.value = '';
+        resetDepositOptions();
         closeModal(expenseModal);
         showToast('Expense added successfully', 'success');
     });
@@ -3105,6 +3155,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (ledger.balance <= 0) { showToast(`Ledger "${ledgerName}" has zero balance.`, 'error'); return; }
         if (amount <= 0) { showToast('Please enter a valid amount.', 'error'); return; }
         if (amount > ledger.balance) { showToast(`Amount exceeds balance of ${fmtCurrency(ledger.balance)}.`, 'error'); return; }
+        if (!validateDeposit(bankExpenseDepositCheck, bankExpenseDepositSelect, ledgerName)) return;
 
         const sourceId = 'bnk-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
         const todayStr = getSelectedDateStr();
@@ -3116,6 +3167,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
         await deductFromLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
+        await applyDeposit(bankExpenseDepositCheck, bankExpenseDepositSelect, amount, caption, ledgerName, sourceId);
 
         allBankExpenses.push({
             caption, ledger_name: ledgerName, amount, source_id: sourceId, date: todayStr
@@ -3125,6 +3177,7 @@ document.addEventListener('DOMContentLoaded', function() {
         applySearchFilter();
 
         bankExpenseCaptionInput.value = ''; bankExpenseAmountInput.value = '';
+        resetDepositOptions();
         closeModal(bankExpenseModal);
         showToast('Bank expense added', 'success');
     });
@@ -3399,6 +3452,17 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     /* ============ DELETE HANDLERS ============ */
+    // If the deleted expense also deposited into another ledger, take that amount back out.
+    async function reverseDeposit(sourceId) {
+        if (!sourceId) return;
+        const depId = sourceId + '-dep';
+        const dep = ledgerHistory.find(h => h.sourceId === depId);
+        if (!dep) return;
+        await sb.from('ledger_history').delete().eq('source_id', depId);
+        ledgerHistory = ledgerHistory.filter(h => h.sourceId !== depId);
+        await deductFromLedger(dep.ledgerName, dep.amount, 'Delete: ' + dep.caption, 'Reversal', null);
+    }
+
     expenseTableBody.addEventListener('click', async (e) => {
         const btn = e.target.closest('.btn-delete-row'); if (!btn) return;
         const row = btn.closest('tr');
@@ -3413,6 +3477,7 @@ document.addEventListener('DOMContentLoaded', function() {
             await sb.from('ledger_history').delete().eq('source_id', sourceId);
         }
         if (ledgerName) await creditToLedger(ledgerName, amount, caption, type, sourceId);
+        await reverseDeposit(sourceId);
 
         allExpenses = allExpenses.filter(e => e.source_id !== sourceId);
 
@@ -3435,6 +3500,7 @@ document.addEventListener('DOMContentLoaded', function() {
             await sb.from('ledger_history').delete().eq('source_id', sourceId);
         }
         if (ledgerName) await creditToLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
+        await reverseDeposit(sourceId);
 
         allBankExpenses = allBankExpenses.filter(e => e.source_id !== sourceId);
 
