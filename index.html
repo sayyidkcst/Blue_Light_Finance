@@ -833,7 +833,7 @@
         </div>
         <div class="header-right">
             <div class="user-name" id="currentUser">USER</div>
-            <div class="time-yellow" id="liveClock">--:--:-- --</div>
+            <div class="time-yellow" id="liveClock">--:-- -- --</div>
             <div class="conn-status" id="connStatus">● Connecting…</div>
         </div>
     </div>
@@ -1685,7 +1685,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const seconds = String(now.getSeconds()).padStart(2, '0');
         const ampm = hours >= 12 ? 'PM' : 'AM';
         hours = hours % 12; hours = hours ? hours : 12;
-        liveClockEl.textContent = `${String(hours).padStart(2,'0')}:${minutes}:${seconds} ${ampm}`;
+        liveClockEl.textContent = `${String(hours).padStart(2,'0')}:${minutes} ${seconds} ${ampm}`;
     }
     updateClock(); setInterval(updateClock, 1000);
 
