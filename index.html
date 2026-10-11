@@ -964,8 +964,6 @@
                         <tr><th>Currency</th><th style="text-align: center;">Count</th><th style="text-align: right;">Total</th></tr>
                     </thead>
                     <tbody>
-                        <tr><td>2000</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="2000"></td><td class="row-total">0.00</td></tr>
-                        <tr><td>1000</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="1000"></td><td class="row-total">0.00</td></tr>
                         <tr><td>500</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="500"></td><td class="row-total">0.00</td></tr>
                         <tr><td>200</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="200"></td><td class="row-total">0.00</td></tr>
                         <tr><td>100</td><td><input type="number" class="denom-input" placeholder="0" min="0" data-currency="100"></td><td class="row-total">0.00</td></tr>
@@ -1420,7 +1418,7 @@
 
 <div class="calculator-window" id="calculatorWindow">
     <div class="calc-titlebar" id="calcTitlebar">
-        <span>KCST Calculator</span>
+        <span>Calculator</span>
         <div class="calc-titlebar-buttons">
             <button class="calc-titlebar-btn" id="closeCalculatorBtn" title="Close">&times;</button>
         </div>
@@ -1587,6 +1585,14 @@ document.addEventListener('DOMContentLoaded', function() {
        APP LOGIC
        ============================================================ */
     const denomInputs = document.querySelectorAll('.denom-input');
+    // Records saved before 2000/1000 were removed have 10 counts; newer ones follow the current rows.
+    const LEGACY_DENOMS = [2000, 1000, 500, 200, 100, 50, 20, 10, 5, 1];
+    const CURRENT_DENOMS = Array.from(denomInputs).map(i => parseFloat(i.getAttribute('data-currency')) || 0);
+    function denomListFor(denoms) { return (denoms && denoms.length === LEGACY_DENOMS.length) ? LEGACY_DENOMS : CURRENT_DENOMS; }
+    function denomCountFor(denoms, currency) {
+        const idx = denomListFor(denoms).indexOf(currency);
+        return idx >= 0 ? (parseFloat(denoms[idx]) || 0) : 0;
+    }
     const denomGrandTotalEl = document.getElementById('denomGrandTotal');
     const shiftCashResultEl = document.getElementById('shiftCashResultDisplay');
     const refreshBtn = document.getElementById('refreshBtn');
@@ -1856,8 +1862,8 @@ document.addEventListener('DOMContentLoaded', function() {
         openingInput.value = data.opening || '';
         othersInput.value = data.others || '';
         const denoms = data.denominations || [];
-        denomInputs.forEach((input, i) => {
-            input.value = denoms[i] || '';
+        denomInputs.forEach(input => {
+            input.value = denomCountFor(denoms, parseFloat(input.getAttribute('data-currency')) || 0) || '';
         });
         calculateTotals();
         return true;
@@ -1911,4 +1917,2181 @@ document.addEventListener('DOMContentLoaded', function() {
             balance: 0
         }).select().single();
 
-        if (error) { console.error('Failed to create Smart Pay Led
+        if (error) { console.error('Failed to create Smart Pay Ledger:', error); return null; }
+        const newLedger = { id: data.id, name: data.name, balance: 0 };
+        ledgers.push(newLedger);
+        return newLedger;
+    }
+
+    function extractDate(createdAt) {
+        if (!createdAt) return '';
+        const d = new Date(createdAt);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth()+1).padStart(2,'0');
+        const dd = String(d.getDate()).padStart(2,'0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    async function loadAllData() {
+        if (!currentUser || dataLoaded) return;
+        dataLoaded = true;
+        connStatusEl.textContent = '● Syncing…';
+        connStatusEl.classList.remove('online','offline');
+
+        try {
+            const { data: ledgersData, error: e1 } = await sb.from('ledgers').select('*').order('created_at');
+            if (e1) throw e1;
+            ledgers = (ledgersData || []).map(r => ({ id: r.id, name: r.name, balance: parseFloat(r.balance) || 0 }));
+
+            await ensureSmartPayLedger();
+
+            const { data: histData, error: e2 } = await sb.from('ledger_history').select('*').order('created_at', { ascending: false });
+            if (e2) throw e2;
+            ledgerHistory = (histData || []).map(r => ({
+                id: r.id, date: r.txn_date, ledgerName: r.ledger_name, caption: r.caption,
+                type: r.txn_type, amount: parseFloat(r.amount) || 0,
+                balanceAfter: parseFloat(r.balance_after) || 0,
+                isDebit: r.is_debit, sourceId: r.source_id
+            }));
+
+            // Load expenses
+            const { data: expData, error: e3 } = await sb.from('expenses').select('*').order('created_at');
+            if (e3) throw e3;
+            allExpenses = (expData || []).map(r => ({
+                caption: r.caption,
+                ledger_name: r.ledger_name,
+                amount: parseFloat(r.amount) || 0,
+                expense_type: r.expense_type,
+                source_id: r.source_id,
+                date: extractDate(r.created_at)
+            }));
+
+            // Load bank expenses
+            const { data: bankData, error: e4 } = await sb.from('bank_expenses').select('*').order('created_at');
+            if (e4) throw e4;
+            allBankExpenses = (bankData || []).map(r => ({
+                caption: r.caption,
+                ledger_name: r.ledger_name,
+                amount: parseFloat(r.amount) || 0,
+                source_id: r.source_id,
+                date: extractDate(r.created_at)
+            }));
+
+            // Load income
+            const { data: incomeData, error: e5 } = await sb.from('smartpay_income').select('*').order('created_at');
+            if (e5) throw e5;
+            allIncome = (incomeData || []).map(r => ({
+                invoice: r.invoice,
+                amount: parseFloat(r.amount) || 0,
+                source_id: r.id,
+                date: extractDate(r.created_at)
+            }));
+
+            await loadMultiLedgerSettings();
+            renderLedgerList();
+            updateLedgerDropdowns();
+            populateHistoryFilter();
+            updateMultiLedgerTotalDisplay();
+            calculateTotals();
+
+            renderDailyTables();
+
+            await loadDailyData();
+
+            // Expiry info loads last and separately, so a problem here can never block the rest of the app
+            try { await loadExpiryFromDb(); updateNextExpiryHeader(); } catch (e) { console.error('Expiry load failed:', e); }
+
+            connStatusEl.textContent = '● Online';
+            connStatusEl.classList.add('online');
+        } catch (err) {
+            console.error('Load error:', err);
+            connStatusEl.textContent = '● Sync error';
+            connStatusEl.classList.add('offline');
+            showToast('Error loading data: ' + err.message, 'error');
+        }
+    }
+
+    /* ============================================================
+       RENDER HELPERS
+       ============================================================ */
+    function renderExpenseEmptyState() {
+        expenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="5">No expenses for this date.</td></tr>`;
+    }
+    function renderBankExpenseEmptyState() {
+        bankExpenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="4">No bank expenses for this date.</td></tr>`;
+    }
+    function renderSmartPayIncomeEmptyState() {
+        smartPayIncomeTableBody.innerHTML = `<tr class="empty-row"><td colspan="3">No income for this date.</td></tr>`;
+    }
+    function renderLedgerEmptyState() {
+        ledgerListContainer.innerHTML = `<tr class="empty-row"><td colspan="4">No ledgers added yet.</td></tr>`;
+    }
+
+    function addExpenseRow(caption, ledgerName, amount, type, sourceId, dateStr) {
+        const emptyRow = expenseTableBody.querySelector('.empty-row');
+        if (emptyRow) emptyRow.remove();
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td>${caption}</td><td>${ledgerName}</td><td>${fmtCurrency(amount)}</td><td>${type}</td>
+            <td style="text-align: center;">
+                <button class="btn-delete-row" title="Delete Expense">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                </button>
+            </td>`;
+        newRow.dataset.amount = amount;
+        newRow.dataset.ledgerName = ledgerName;
+        newRow.dataset.caption = caption;
+        newRow.dataset.type = type;
+        newRow.dataset.sourceId = sourceId || '';
+        newRow.dataset.date = dateStr || '';
+        expenseTableBody.appendChild(newRow);
+    }
+
+    function addBankExpenseRow(caption, ledgerName, amount, sourceId, dateStr) {
+        const emptyRow = bankExpenseTableBody.querySelector('.empty-row');
+        if (emptyRow) emptyRow.remove();
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td>${caption}</td><td>${ledgerName}</td><td>${fmtCurrency(amount)}</td>
+            <td style="text-align: center;">
+                <button class="btn-delete-row" title="Delete Expense">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                </button>
+            </td>`;
+        newRow.dataset.amount = amount;
+        newRow.dataset.ledgerName = ledgerName;
+        newRow.dataset.caption = caption;
+        newRow.dataset.sourceId = sourceId || '';
+        newRow.dataset.date = dateStr || '';
+        bankExpenseTableBody.appendChild(newRow);
+    }
+
+    function addIncomeRow(invoice, amount, sourceId, dateStr) {
+        const emptyRow = smartPayIncomeTableBody.querySelector('.empty-row');
+        if (emptyRow) emptyRow.remove();
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td>${invoice}</td><td>${fmtCurrency(amount)}</td>
+            <td style="text-align: center;">
+                <button class="btn-delete-row" title="Delete Income">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                </button>
+            </td>`;
+        newRow.dataset.amount = amount;
+        newRow.dataset.sourceId = sourceId || '';
+        newRow.dataset.date = dateStr || '';
+        smartPayIncomeTableBody.appendChild(newRow);
+    }
+
+    /* ============================================================
+       DAILY FILTER + TOTALS
+       ============================================================ */
+    function renderDailyTables() {
+        const selectedDate = datePicker.value;
+
+        // Rebuild cash expense table
+        expenseTableBody.innerHTML = '';
+        const todayExpenses = allExpenses.filter(e => e.date === selectedDate);
+        if (todayExpenses.length === 0) {
+            renderExpenseEmptyState();
+        } else {
+            todayExpenses.forEach(e => {
+                addExpenseRow(e.caption, e.ledger_name, e.amount, e.expense_type, e.source_id, e.date);
+            });
+        }
+
+        // Rebuild bank expense table
+        bankExpenseTableBody.innerHTML = '';
+        const todayBank = allBankExpenses.filter(e => e.date === selectedDate);
+        if (todayBank.length === 0) {
+            renderBankExpenseEmptyState();
+        } else {
+            todayBank.forEach(e => {
+                addBankExpenseRow(e.caption, e.ledger_name, e.amount, e.source_id, e.date);
+            });
+        }
+
+        // Rebuild income table
+        smartPayIncomeTableBody.innerHTML = '';
+        const todayIncome = allIncome.filter(e => e.date === selectedDate);
+        if (todayIncome.length === 0) {
+            renderSmartPayIncomeEmptyState();
+        } else {
+            todayIncome.forEach(e => {
+                addIncomeRow(e.invoice, e.amount, e.source_id, e.date);
+            });
+        }
+
+        recalculateDailyTotals();
+    }
+
+    function recalculateDailyTotals() {
+        const selectedDate = datePicker.value;
+
+        // Cash expenses for the selected date
+        const dailyCashExpense = allExpenses
+            .filter(e => e.date === selectedDate)
+            .reduce((sum, e) => sum + e.amount, 0);
+
+        // Bank expenses for the selected date
+        const dailyBankExpense = allBankExpenses
+            .filter(e => e.date === selectedDate)
+            .reduce((sum, e) => sum + e.amount, 0);
+
+        // Income for the selected date
+        const dailyIncome = allIncome
+            .filter(e => e.date === selectedDate)
+            .reduce((sum, e) => sum + e.amount, 0);
+
+        // Update displays with daily totals
+        leftTotalExpenseDisplayEl.textContent = fmtCurrency(dailyCashExpense);
+        smartPayExpenseDisplayEl.textContent = fmtCurrency(dailyBankExpense);
+        smartPayIncomeDisplayEl.textContent = fmtCurrency(dailyIncome);
+
+        // Header total = cash expenses + bank expenses for the day
+        headerTotalExpensesEl.textContent = fmtCurrency(dailyCashExpense + dailyBankExpense);
+
+        // Update internal totals used for shift cash calculation
+        totalExpenseAmount = dailyCashExpense;
+        smartPayExpenseAmount = dailyBankExpense;
+        smartPayIncomeAmount = dailyIncome;
+
+        calculateTotals();
+        updateMultiLedgerTotalDisplay();
+    }
+
+    /* ============ MODALS ============ */
+    function openModal(m) { m.classList.add('active'); }
+    function closeModal(m) { m.classList.remove('active'); }
+
+    openExpenseModalBtn.addEventListener('click', () => { openModal(expenseModal); expenseCaptionInput.focus(); });
+    closeExpenseModalBtn.addEventListener('click', () => closeModal(expenseModal));
+    cancelExpenseBtn.addEventListener('click', () => closeModal(expenseModal));
+    expenseModal.addEventListener('click', e => { if (e.target === expenseModal) closeModal(expenseModal); });
+    expenseCaptionInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); expenseAmountInput.focus(); expenseAmountInput.select(); }
+    });
+    expenseAmountInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); submitExpenseBtn.click(); }
+    });
+
+    openBankExpenseModalBtn.addEventListener('click', () => { openModal(bankExpenseModal); bankExpenseCaptionInput.focus(); });
+    closeBankExpenseModalBtn.addEventListener('click', () => closeModal(bankExpenseModal));
+    cancelBankExpenseBtn.addEventListener('click', () => closeModal(bankExpenseModal));
+    bankExpenseModal.addEventListener('click', e => { if (e.target === bankExpenseModal) closeModal(bankExpenseModal); });
+    bankExpenseCaptionInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); bankExpenseAmountInput.focus(); bankExpenseAmountInput.select(); }
+    });
+    bankExpenseAmountInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); submitBankExpenseBtn.click(); }
+    });
+
+    openSmartPayIncomeModalBtn.addEventListener('click', () => {
+        updateLedgerDropdowns();
+        openModal(smartPayIncomeModal);
+        smartPayInvoiceInput.focus();
+    });
+    closeSmartPayIncomeModalBtn.addEventListener('click', () => closeModal(smartPayIncomeModal));
+    cancelSmartPayIncomeBtn.addEventListener('click', () => closeModal(smartPayIncomeModal));
+    smartPayIncomeModal.addEventListener('click', e => { if (e.target === smartPayIncomeModal) closeModal(smartPayIncomeModal); });
+    smartPayInvoiceInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); incomeLedgerSelect.focus(); }
+    });
+    incomeLedgerSelect.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); smartPayIncomeAmountInput.focus(); smartPayIncomeAmountInput.select(); }
+    });
+    smartPayIncomeAmountInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); submitSmartPayIncomeBtn.click(); }
+    });
+
+    openLedgerModalBtn.addEventListener('click', () => { openModal(ledgerModal); ledgerNameInput.focus(); });
+    closeLedgerModalBtn.addEventListener('click', () => closeModal(ledgerModal));
+    cancelLedgerBtn.addEventListener('click', () => closeModal(ledgerModal));
+    ledgerModal.addEventListener('click', e => { if (e.target === ledgerModal) closeModal(ledgerModal); });
+
+    /* ============ MULTI LEDGER MODAL ============ */
+    function populateMultiLedgerSelect() {
+        const cur = multiLedgerSelect.value;
+        multiLedgerSelect.innerHTML = '';
+        const available = ledgers.filter(l => !multiLedgerIds.includes(l.id));
+        if (available.length === 0) {
+            const o = document.createElement('option');
+            o.value = ''; o.textContent = '-- No More Ledgers --'; o.disabled = true; o.selected = true;
+            multiLedgerSelect.appendChild(o);
+        } else {
+            available.forEach(l => {
+                const o = document.createElement('option');
+                o.value = l.id;
+                o.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
+                multiLedgerSelect.appendChild(o);
+            });
+            if ([...multiLedgerSelect.options].some(o => o.value === cur)) {
+                multiLedgerSelect.value = cur;
+            }
+        }
+    }
+
+    function renderMultiLedgerBalances() {
+        const selected = ledgers.filter(l => multiLedgerIds.includes(l.id));
+        if (selected.length === 0) {
+            multiLedgerBalanceBody.innerHTML = `<tr class="empty-row"><td colspan="4">No ledgers selected yet. Use the combo box above.</td></tr>`;
+            multiLedgerTotalBalanceEl.textContent = fmtCurrency(0);
+            multiLedgerTotalBalanceEl.classList.remove('negative');
+            updateMultiLedgerTotalDisplay();
+            return;
+        }
+        multiLedgerBalanceBody.innerHTML = '';
+        let total = 0;
+        selected.forEach((l, i) => {
+            total += l.balance;
+            const row = document.createElement('tr');
+            let balClass = 'ml-balance';
+            if (l.balance < 0) balClass += ' negative';
+            else if (l.balance === 0) balClass += ' zero';
+            row.innerHTML = `
+                <td style="color: var(--text-muted); font-weight: 600;">${i+1}</td>
+                <td class="ml-name">${l.name}</td>
+                <td class="${balClass}">${fmtCurrency(l.balance)}</td>
+                <td class="ml-action">
+                    <button title="Remove" data-ml-id="${l.id}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>
+                </td>
+            `;
+            multiLedgerBalanceBody.appendChild(row);
+        });
+        multiLedgerTotalBalanceEl.textContent = fmtCurrency(total);
+        if (total < 0) multiLedgerTotalBalanceEl.classList.add('negative');
+        else multiLedgerTotalBalanceEl.classList.remove('negative');
+        updateMultiLedgerTotalDisplay();
+    }
+
+    async function addMultiLedgerEntry() {
+        const id = multiLedgerSelect.value;
+        if (!id) { showToast('Please select a ledger.', 'error'); return; }
+        if (multiLedgerIds.includes(id)) { showToast('This ledger is already added.', 'error'); return; }
+
+        multiLedgerIds.push(id);
+        populateMultiLedgerSelect();
+        renderMultiLedgerBalances();
+        const l = ledgers.find(x => x.id === id);
+        await saveMultiLedgerSettings();
+        showToast(`Added "${l ? l.name : ''}" to Multi Ledger`, 'success');
+    }
+
+    multiLedgerAddBtn.addEventListener('click', addMultiLedgerEntry);
+
+    multiLedgerBalanceBody.addEventListener('click', async e => {
+        const btn = e.target.closest('button[data-ml-id]');
+        if (!btn) return;
+        const id = btn.dataset.mlId;
+        multiLedgerIds = multiLedgerIds.filter(x => x !== id);
+        populateMultiLedgerSelect();
+        renderMultiLedgerBalances();
+        await saveMultiLedgerSettings();
+        showToast('Ledger removed', 'success');
+    });
+
+    function openMultiLedger() {
+        populateMultiLedgerSelect();
+        renderMultiLedgerBalances();
+        openModal(multiLedgerModal);
+    }
+
+    openMultiLedgerModalBtn.addEventListener('click', openMultiLedger);
+    closeMultiLedgerModalBtn.addEventListener('click', () => closeModal(multiLedgerModal));
+    closeMultiLedgerBtn.addEventListener('click', () => closeModal(multiLedgerModal));
+    multiLedgerModal.addEventListener('click', e => { if (e.target === multiLedgerModal) closeModal(multiLedgerModal); });
+
+    /* ============ LEDGER TRANSFER ============ */
+    function populateTransferSelects() {
+        const fromVal = transferFromLedgerSelect.value;
+        const toVal = transferToLedgerSelect.value;
+
+        transferFromLedgerSelect.innerHTML = '';
+        transferToLedgerSelect.innerHTML = '';
+
+        if (ledgers.length === 0) {
+            const o = document.createElement('option');
+            o.value = ''; o.textContent = '-- No Ledgers --'; o.disabled = true; o.selected = true;
+            transferFromLedgerSelect.appendChild(o.cloneNode(true));
+            transferToLedgerSelect.appendChild(o);
+            return;
+        }
+
+        ledgers.forEach(l => {
+            const o1 = document.createElement('option');
+            o1.value = l.id;
+            o1.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
+            transferFromLedgerSelect.appendChild(o1);
+
+            const o2 = document.createElement('option');
+            o2.value = l.id;
+            o2.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
+            transferToLedgerSelect.appendChild(o2);
+        });
+
+        if ([...transferFromLedgerSelect.options].some(o => o.value === fromVal)) {
+            transferFromLedgerSelect.value = fromVal;
+        }
+        if ([...transferToLedgerSelect.options].some(o => o.value === toVal)) {
+            transferToLedgerSelect.value = toVal;
+        }
+
+        // Default: first for From, second for To (if available)
+        if (!fromVal && ledgers.length > 0) transferFromLedgerSelect.value = ledgers[0].id;
+        if (!toVal && ledgers.length > 1) transferToLedgerSelect.value = ledgers[1].id;
+        updateTransferPreview();
+    }
+
+    function updateTransferPreview() {
+        const fromId = transferFromLedgerSelect.value;
+        const toId = transferToLedgerSelect.value;
+        const amount = parseFloat(transferAmountInput.value) || 0;
+
+        if (!fromId || !toId) {
+            transferPreview.style.display = 'none';
+            return;
+        }
+
+        const fromLedger = ledgers.find(l => l.id === fromId);
+        const toLedger = ledgers.find(l => l.id === toId);
+
+        if (!fromLedger || !toLedger) {
+            transferPreview.style.display = 'none';
+            return;
+        }
+
+        transferPreview.style.display = 'block';
+        previewFromName.textContent = fromLedger.name;
+        previewFromBalance.textContent = fmtCurrency(fromLedger.balance) + (amount > 0 ? ` → ${fmtCurrency(fromLedger.balance - amount)}` : '');
+        previewToName.textContent = toLedger.name;
+        previewToBalance.textContent = fmtCurrency(toLedger.balance) + (amount > 0 ? ` → ${fmtCurrency(toLedger.balance + amount)}` : '');
+    }
+
+    transferFromLedgerSelect.addEventListener('change', updateTransferPreview);
+    transferToLedgerSelect.addEventListener('change', updateTransferPreview);
+    transferAmountInput.addEventListener('input', updateTransferPreview);
+
+    openLedgerTransferModalBtn.addEventListener('click', () => {
+        populateTransferSelects();
+        transferAmountInput.value = '';
+        transferCaptionInput.value = 'Ledger Transfer';
+        updateTransferPreview();
+        openModal(ledgerTransferModal);
+        transferAmountInput.focus();
+    });
+    closeLedgerTransferModalBtn.addEventListener('click', () => closeModal(ledgerTransferModal));
+    cancelLedgerTransferBtn.addEventListener('click', () => closeModal(ledgerTransferModal));
+    ledgerTransferModal.addEventListener('click', e => { if (e.target === ledgerTransferModal) closeModal(ledgerTransferModal); });
+
+    transferAmountInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); transferCaptionInput.focus(); transferCaptionInput.select(); }
+    });
+    transferCaptionInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); submitLedgerTransferBtn.click(); }
+    });
+
+    /* ============ EDIT LEDGER MODAL ============ */
+    closeEditLedgerModalBtn.addEventListener('click', () => closeModal(editLedgerModal));
+    cancelEditLedgerBtn.addEventListener('click', () => closeModal(editLedgerModal));
+    editLedgerModal.addEventListener('click', e => { if (e.target === editLedgerModal) closeModal(editLedgerModal); });
+    editLedgerNameInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); editLedgerBalanceInput.focus(); editLedgerBalanceInput.select(); }
+    });
+    editLedgerBalanceInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); submitEditLedgerBtn.click(); }
+    });
+
+    /* ============ EDIT HISTORY MODAL ============ */
+    closeEditHistoryModalBtn.addEventListener('click', () => closeModal(editHistoryModal));
+    cancelEditHistoryBtn.addEventListener('click', () => closeModal(editHistoryModal));
+    editHistoryModal.addEventListener('click', e => { if (e.target === editHistoryModal) closeModal(editHistoryModal); });
+    editHistoryCaptionInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); editHistoryAmountInput.focus(); editHistoryAmountInput.select(); }
+    });
+    editHistoryAmountInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); submitEditHistoryBtn.click(); }
+    });
+
+    openLedgerHistoryModalBtn.addEventListener('click', () => {
+        openModal(ledgerHistoryModal);
+        populateHistoryFilter(); renderHistoryTable();
+    });
+    closeLedgerHistoryModalBtn.addEventListener('click', () => closeModal(ledgerHistoryModal));
+    closeHistoryBtn.addEventListener('click', () => closeModal(ledgerHistoryModal));
+    ledgerHistoryModal.addEventListener('click', e => { if (e.target === ledgerHistoryModal) closeModal(ledgerHistoryModal); });
+
+    historyLedgerFilter.addEventListener('change', renderHistoryTable);
+
+    /* ============ MONTHLY EXPENCE REPORT ============ */
+    const monthlyExpenceModal = document.getElementById('monthlyExpenceModal');
+    const monthlyExpenceMonth = document.getElementById('monthlyExpenceMonth');
+    const monthlyExpenceType = document.getElementById('monthlyExpenceType');
+    const monthlyExpenceBody = document.getElementById('monthlyExpenceTableBody');
+
+    function escHtml(v) {
+        return String(v == null ? '' : v).replace(/[&<>"']/g, c => (
+            { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]
+        ));
+    }
+
+    function getMonthlyExpenceData() {
+        const month = monthlyExpenceMonth.value; // YYYY-MM
+        const type = monthlyExpenceType.value;
+        let rows = [];
+        if (type !== 'bank') {
+            allExpenses.filter(e => e.date && e.date.startsWith(month))
+                .forEach(e => rows.push({ date: e.date, caption: e.caption, ledger: e.ledger_name, kind: 'Cash', amount: e.amount }));
+        }
+        if (type !== 'cash') {
+            allBankExpenses.filter(e => e.date && e.date.startsWith(month))
+                .forEach(e => rows.push({ date: e.date, caption: e.caption, ledger: e.ledger_name, kind: 'Bank', amount: e.amount }));
+        }
+        rows.sort((a, b) => a.date.localeCompare(b.date));
+        const cash = rows.filter(r => r.kind === 'Cash').reduce((t, r) => t + r.amount, 0);
+        const bank = rows.filter(r => r.kind === 'Bank').reduce((t, r) => t + r.amount, 0);
+        return { rows, cash, bank, total: cash + bank };
+    }
+
+    function renderMonthlyExpence() {
+        if (!monthlyExpenceMonth.value) return;
+        const d = getMonthlyExpenceData();
+        document.getElementById('monthlyCashTotal').textContent = fmtCurrency(d.cash);
+        document.getElementById('monthlyBankTotal').textContent = fmtCurrency(d.bank);
+        document.getElementById('monthlyGrandTotal').textContent = fmtCurrency(d.total);
+        if (d.rows.length === 0) {
+            monthlyExpenceBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">No expenses found for this month</td></tr>';
+            return;
+        }
+        monthlyExpenceBody.innerHTML = d.rows.map((r, i) => `
+            <tr>
+                <td style="color:var(--text-muted);">${i + 1}</td>
+                <td>${escHtml(r.date)}</td>
+                <td>${escHtml(r.caption)}</td>
+                <td>${escHtml(r.ledger)}</td>
+                <td>${r.kind}</td>
+                <td class="debit" style="text-align:right;">${fmtCurrency(r.amount)}</td>
+            </tr>`).join('');
+    }
+
+    document.getElementById('openMonthlyExpenceModal').addEventListener('click', () => {
+        if (!monthlyExpenceMonth.value) {
+            const n = new Date();
+            monthlyExpenceMonth.value = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+        }
+        openModal(monthlyExpenceModal);
+        renderMonthlyExpence();
+    });
+    document.getElementById('closeMonthlyExpenceModal').addEventListener('click', () => closeModal(monthlyExpenceModal));
+    document.getElementById('closeMonthlyExpenceBtn').addEventListener('click', () => closeModal(monthlyExpenceModal));
+    monthlyExpenceModal.addEventListener('click', e => { if (e.target === monthlyExpenceModal) closeModal(monthlyExpenceModal); });
+    monthlyExpenceMonth.addEventListener('change', renderMonthlyExpence);
+    monthlyExpenceType.addEventListener('change', renderMonthlyExpence);
+
+    document.getElementById('printMonthlyExpenceBtn').addEventListener('click', () => {
+        const d = getMonthlyExpenceData();
+        if (d.rows.length === 0) { showToast('No expenses to print.', 'error'); return; }
+        const [y, m] = monthlyExpenceMonth.value.split('-');
+        const monthLabel = new Date(+y, +m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        const rowsHtml = d.rows.map((r, i) => `
+            <tr>
+                <td style="text-align:center;">${i + 1}</td>
+                <td>${escHtml(r.date)}</td>
+                <td>${escHtml(r.caption)}</td>
+                <td>${escHtml(r.ledger)}</td>
+                <td>${r.kind}</td>
+                <td style="text-align:right; color:#dc2626;">${fmtCurrency(r.amount)}</td>
+            </tr>`).join('');
+        const w = window.open('', '_blank', 'width=900,height=700');
+        if (!w) { showToast('Please allow pop-ups to print.', 'error'); return; }
+        w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Monthly Expence - ${monthLabel}</title>
+            <style>
+                * { box-sizing: border-box; margin: 0; padding: 0; }
+                body { font-family: 'Inter', Arial, sans-serif; padding: 24px; color: #1e293b; }
+                h1 { font-size: 22px; color: #0f172a; border-bottom: 3px solid #0f172a; padding-bottom: 10px; margin-bottom: 6px; }
+                .sub { color: #64748b; font-size: 13px; margin-bottom: 16px; }
+                table { width: 100%; border-collapse: collapse; font-size: 13px; }
+                th { background: #f1f5f9; text-align: left; padding: 8px; border-bottom: 2px solid #cbd5e1; }
+                td { padding: 7px 8px; border-bottom: 1px solid #e2e8f0; }
+                .totals { margin-top: 16px; text-align: right; font-size: 14px; line-height: 1.8; }
+                .totals .grand { font-size: 16px; font-weight: 700; }
+            </style></head><body>
+            <h1>Monthly Expence Report</h1>
+            <div class="sub">${monthLabel}</div>
+            <table>
+                <thead><tr><th style="width:40px;">#</th><th style="width:100px;">Date</th><th>Caption</th><th>Ledger</th><th style="width:70px;">Type</th><th style="text-align:right; width:110px;">Amount</th></tr></thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+            <div class="totals">
+                <div>Cash Expence: ${fmtCurrency(d.cash)}</div>
+                <div>Bank Expence: ${fmtCurrency(d.bank)}</div>
+                <div class="grand">Total Expence: ${fmtCurrency(d.total)}</div>
+            </div>
+            <script>window.onload = function(){ window.print(); };<\/script>
+            </body></html>`);
+        w.document.close();
+    });
+
+    /* ============ PRINT LEDGER TRANSACTIONS ============ */
+    document.getElementById('printLedgerBtn').addEventListener('click', () => {
+        const filter = historyLedgerFilter.value;
+        const filtered = filter === 'all'
+            ? ledgerHistory
+            : ledgerHistory.filter(h => h.ledgerName === filter);
+
+        if (filtered.length === 0) {
+            showToast('No transactions to print.', 'error');
+            return;
+        }
+
+        const filterLabel = filter === 'all' ? 'All Ledgers' : filter;
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-US', {
+            year: 'numeric', month: 'long', day: 'numeric'
+        });
+        const timeStr = now.toLocaleTimeString('en-US', {
+            hour: '2-digit', minute: '2-digit'
+        });
+
+        let finalBalance;
+        if (filter === 'all') {
+            finalBalance = ledgers.reduce((sum, l) => sum + (Number(l.balance) || 0), 0);
+        } else {
+            const lg = ledgers.find(l => l.name === filter);
+            finalBalance = lg ? Number(lg.balance) || 0 : filtered[filtered.length - 1].balanceAfter;
+        }
+
+        let totalDebit = 0, totalCredit = 0;
+        let rowsHtml = '';
+        filtered.forEach((record, i) => {
+            const debit = record.isDebit ? record.amount : 0;
+            const credit = !record.isDebit ? record.amount : 0;
+            totalDebit += debit;
+            totalCredit += credit;
+            rowsHtml += `
+                <tr>
+                    <td style="text-align:center;">${i + 1}</td>
+                    <td>${record.date}</td>
+                    <td>${record.caption} <span style="color:#64748b; font-size:11px;">(${record.ledgerName})</span></td>
+                    <td style="text-align:right; color:#dc2626;">${debit ? fmtCurrency(debit) : ''}</td>
+                    <td style="text-align:right; color:#059669;">${credit ? fmtCurrency(credit) : ''}</td>
+                    <td style="text-align:right; font-weight:600;">${fmtCurrency(record.balanceAfter)}</td>
+                </tr>`;
+        });
+
+        const printWindow = window.open('', '_blank', 'width=900,height=700');
+        if (!printWindow) {
+            showToast('Please allow pop-ups to print.', 'error');
+            return;
+        }
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Ledger Transactions - ${filterLabel}</title>
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body {
+                        font-family: 'Inter', Arial, sans-serif;
+                        padding: 24px;
+                        color: #1e293b;
+                        background: #fff;
+                    }
+                    .print-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-start;
+                        border-bottom: 3px solid #0f172a;
+                        padding-bottom: 14px;
+                        margin-bottom: 20px;
+                    }
+                    .print-header h1 {
+                        font-size: 22px;
+                        color: #0f172a;
+                        margin-bottom: 4px;
+                    }
+                    .print-header .subtitle {
+                        font-size: 13px;
+                        color: #64748b;
+                    }
+                    .print-header .meta {
+                        text-align: right;
+                        font-size: 12px;
+                        color: #64748b;
+                        line-height: 1.6;
+                    }
+                    .filter-info {
+                        font-size: 14px;
+                        font-weight: 600;
+                        margin-bottom: 14px;
+                        padding: 10px 14px;
+                        background: #f1f5f9;
+                        border-left: 4px solid #0f172a;
+                        border-radius: 4px;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 12px;
+                    }
+                    th {
+                        background: #0f172a;
+                        color: #fff;
+                        text-align: left;
+                        padding: 10px 8px;
+                        font-weight: 600;
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: .4px;
+                    }
+                    td {
+                        padding: 8px;
+                        border-bottom: 1px solid #e2e8f0;
+                        vertical-align: top;
+                    }
+                    tbody tr:nth-child(even) { background: #f8fafc; }
+                    tfoot td {
+                        padding: 12px 8px;
+                        font-weight: 700;
+                        background: #f1f5f9;
+                        border-top: 2px solid #0f172a;
+                        border-bottom: none;
+                        font-size: 13px;
+                    }
+                    .summary {
+                        display: flex;
+                        justify-content: flex-end;
+                        gap: 30px;
+                        margin-top: 18px;
+                        padding-top: 14px;
+                        border-top: 1px solid #cbd5e1;
+                        font-size: 13px;
+                    }
+                    .summary .item { text-align: right; }
+                    .summary .label { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+                    .summary .value { font-size: 16px; font-weight: 700; color: #0f172a; }
+                    .summary .value.debit { color: #dc2626; }
+                    .summary .value.credit { color: #059669; }
+                    .print-footer {
+                        margin-top: 30px;
+                        padding-top: 12px;
+                        border-top: 1px solid #e2e8f0;
+                        font-size: 11px;
+                        color: #94a3b8;
+                        text-align: center;
+                    }
+                    @media print {
+                        body { padding: 12px; }
+                        .print-header { border-bottom-width: 2px; }
+                        th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        tbody tr:nth-child(even) { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <div>
+                        <h1>Ledger Transactions</h1>
+                        <div class="subtitle">Blue Light Finance Pro</div>
+                    </div>
+                    <div class="meta">
+                        <div><strong>Printed:</strong> ${dateStr}</div>
+                        <div><strong>Time:</strong> ${timeStr}</div>
+                        <div><strong>Total Records:</strong> ${filtered.length}</div>
+                    </div>
+                </div>
+
+                <div class="filter-info">Ledger Filter: ${filterLabel}</div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:40px; text-align:center;">No.</th>
+                            <th style="width:100px;">Date</th>
+                            <th>Particular</th>
+                            <th style="width:110px; text-align:right;">Debit</th>
+                            <th style="width:110px; text-align:right;">Credit</th>
+                            <th style="width:120px; text-align:right;">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" style="text-align:right;">TOTALS</td>
+                            <td style="text-align:right; color:#dc2626;">${fmtCurrency(totalDebit)}</td>
+                            <td style="text-align:right; color:#059669;">${fmtCurrency(totalCredit)}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div class="summary">
+                    <div class="item">
+                        <div class="label">Final Balance</div>
+                        <div class="value">${fmtCurrency(finalBalance)}</div>
+                    </div>
+                </div>
+
+                <div class="print-footer">
+                    Generated by Blue Light Finance Pro &middot; ${dateStr} ${timeStr}
+                </div>
+
+                <script>
+                    window.onload = function() {
+                        setTimeout(function() { window.print(); }, 250);
+                    };
+                <\/script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    });
+
+    /* ============ NEW TRANSACTION MODAL ============ */
+    openNewTransactionModalBtn.addEventListener('click', () => {
+        txnLedgerSelect.innerHTML = '';
+        if (ledgers.length === 0) {
+            const o = document.createElement('option'); o.value=''; o.textContent='-- No Ledgers --'; o.disabled=true; o.selected=true;
+            txnLedgerSelect.appendChild(o);
+        } else {
+            ledgers.forEach(l => {
+                const o = document.createElement('option'); o.value = l.name; o.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
+                txnLedgerSelect.appendChild(o);
+            });
+        }
+
+        const currentFilter = historyLedgerFilter.value;
+        if (currentFilter && currentFilter !== 'all') {
+            const match = [...txnLedgerSelect.options].find(o => o.value === currentFilter);
+            if (match) {
+                txnLedgerSelect.value = currentFilter;
+            }
+        }
+
+        const today = new Date();
+        txnDateInput.value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        openModal(newTransactionModal);
+        txnParticularInput.focus();
+        txnParticularInput.select();
+    });
+    closeNewTransactionModalBtn.addEventListener('click', () => closeModal(newTransactionModal));
+    cancelNewTransactionBtn.addEventListener('click', () => closeModal(newTransactionModal));
+    newTransactionModal.addEventListener('click', e => { if (e.target === newTransactionModal) closeModal(newTransactionModal); });
+
+    /* ============ PROFILE MODAL ============ */
+    const profileModal = document.getElementById('profileModal');
+    const openProfileModalBtn = document.getElementById('openProfileModal');
+    const closeProfileModalBtn = document.getElementById('closeProfileModal');
+    const cancelProfileModalBtn = document.getElementById('cancelProfileModal');
+    const profileNewNameInput = document.getElementById('profileNewName');
+    const profileNewPasswordInput = document.getElementById('profileNewPassword');
+    const profileConfirmPasswordInput = document.getElementById('profileConfirmPassword');
+    const updateUsernameBtn = document.getElementById('updateUsernameBtn');
+    const updatePasswordBtn = document.getElementById('updatePasswordBtn');
+
+    openProfileModalBtn.addEventListener('click', () => {
+        profileNewNameInput.value = currentUser?.user_metadata?.username || '';
+        profileNewPasswordInput.value = '';
+        profileConfirmPasswordInput.value = '';
+        openModal(profileModal);
+        profileNewNameInput.focus();
+        profileNewNameInput.select();
+    });
+    closeProfileModalBtn.addEventListener('click', () => closeModal(profileModal));
+    cancelProfileModalBtn.addEventListener('click', () => closeModal(profileModal));
+    profileModal.addEventListener('click', e => { if (e.target === profileModal) closeModal(profileModal); });
+
+    updateUsernameBtn.addEventListener('click', async () => {
+        const newName = profileNewNameInput.value.trim();
+        if (!newName) { showToast('Please enter a new username.', 'error'); return; }
+        if (newName.length < 3) { showToast('Username must be at least 3 characters.', 'error'); return; }
+
+        updateUsernameBtn.disabled = true;
+        const { data, error } = await sb.auth.updateUser({
+            data: { username: newName }
+        });
+        updateUsernameBtn.disabled = false;
+
+        if (error) { showToast('Error: ' + error.message, 'error'); return; }
+
+        currentUser = data.user;
+        currentUserEl.textContent = newName.toUpperCase();
+        closeModal(profileModal);
+        showToast('Username updated successfully', 'success');
+    });
+
+    updatePasswordBtn.addEventListener('click', async () => {
+        const newPass = profileNewPasswordInput.value;
+        const confirmPass = profileConfirmPasswordInput.value;
+
+        if (!newPass || !confirmPass) { showToast('Please fill in both password fields.', 'error'); return; }
+        if (newPass.length < 6) { showToast('Password must be at least 6 characters.', 'error'); return; }
+        if (newPass !== confirmPass) { showToast('Passwords do not match.', 'error'); return; }
+
+        updatePasswordBtn.disabled = true;
+        const { error } = await sb.auth.updateUser({ password: newPass });
+        updatePasswordBtn.disabled = false;
+
+        if (error) { showToast('Error: ' + error.message, 'error'); return; }
+
+        profileNewPasswordInput.value = '';
+        profileConfirmPasswordInput.value = '';
+        closeModal(profileModal);
+        showToast('Password updated successfully', 'success');
+    });
+
+    profileNewNameInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); updateUsernameBtn.click(); }
+    });
+    profileNewPasswordInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); profileConfirmPasswordInput.focus(); }
+    });
+    profileConfirmPasswordInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); updatePasswordBtn.click(); }
+    });
+
+    /* ============ LEDGER DROPDOWNS ============ */
+    function updateLedgerDropdowns() {
+        expenseLedgerSelect.innerHTML = '';
+        bankExpenseLedgerSelect.innerHTML = '';
+        incomeLedgerSelect.innerHTML = '';
+        expenseDepositSelect.innerHTML = '';
+        bankExpenseDepositSelect.innerHTML = '';
+        ledgers.forEach(l => {
+            const o = document.createElement('option');
+            o.value = l.name; o.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
+            expenseDepositSelect.appendChild(o);
+            bankExpenseDepositSelect.appendChild(o.cloneNode(true));
+        });
+
+        const availableLedgers = ledgers.filter(l => l.name !== SMART_PAY_LEDGER_NAME);
+        if (availableLedgers.length === 0) {
+            const p = document.createElement('option');
+            p.value=''; p.textContent='-- No Ledgers --'; p.disabled=true; p.selected=true;
+            expenseLedgerSelect.appendChild(p);
+            bankExpenseLedgerSelect.appendChild(p.cloneNode(true));
+        } else {
+            availableLedgers.forEach(l => {
+                const o1 = document.createElement('option'); o1.value = l.name; o1.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
+                expenseLedgerSelect.appendChild(o1);
+                bankExpenseLedgerSelect.appendChild(o1.cloneNode(true));
+            });
+        }
+
+        if (ledgers.length === 0) {
+            const p = document.createElement('option');
+            p.value=''; p.textContent='-- No Ledgers --'; p.disabled=true; p.selected=true;
+            incomeLedgerSelect.appendChild(p);
+        } else {
+            ledgers.forEach(l => {
+                const o = document.createElement('option');
+                o.value = l.name;
+                o.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
+                incomeLedgerSelect.appendChild(o);
+            });
+        }
+    }
+
+    function populateHistoryFilter() {
+        const cur = historyLedgerFilter.value;
+        historyLedgerFilter.innerHTML = '<option value="all">All Ledgers</option>';
+        ledgers.forEach(l => {
+            const o = document.createElement('option'); o.value = l.name; o.textContent = l.name;
+            historyLedgerFilter.appendChild(o);
+        });
+        if ([...historyLedgerFilter.options].some(o => o.value === cur)) historyLedgerFilter.value = cur;
+    }
+
+    /* ============ POPULATE PARTICULAR DATALIST ============ */
+    function populateParticularList() {
+        const datalist = document.getElementById('particularList');
+        if (!datalist) return;
+        datalist.innerHTML = '';
+
+        const seen = new Set();
+        const skipTypes = ['Opening', 'Reversal', 'Adjustment', 'Transfer'];
+        ledgerHistory.forEach(h => {
+            const caption = (h.caption || '').trim();
+            if (!caption) return;
+            if (skipTypes.includes(h.type)) return;
+            if (seen.has(caption)) return;
+            seen.add(caption);
+
+            const opt = document.createElement('option');
+            opt.value = caption;
+            datalist.appendChild(opt);
+        });
+    }
+
+    function renderHistoryTable() {
+        populateParticularList();
+        const filter = historyLedgerFilter.value;
+        let filtered = filter === 'all' ? ledgerHistory : ledgerHistory.filter(h => h.ledgerName === filter);
+
+        updateHistoryCurrentBalance(filter);
+
+        if (filtered.length === 0) {
+            historyTableBody.innerHTML = `<tr class="empty-row"><td colspan="6">No history records found.</td></tr>`;
+            return;
+        }
+        historyTableBody.innerHTML = '';
+        [...filtered].forEach(record => {
+            const row = document.createElement('tr');
+            const debitDisplay = record.isDebit ? fmtCurrency(record.amount) : '';
+            const creditDisplay = !record.isDebit ? fmtCurrency(record.amount) : '';
+            row.dataset.historyId = record.id;
+            row.innerHTML = `
+                <td>${record.date}</td>
+                <td>${record.caption} <span style="color: var(--text-muted); font-size: 12px;">(${record.ledgerName})</span></td>
+                <td style="text-align: right;" class="debit">${debitDisplay}</td>
+                <td style="text-align: right;" class="credit">${creditDisplay}</td>
+                <td style="text-align: right;" class="balance-col">${fmtCurrency(record.balanceAfter)}</td>
+                <td class="action-col">
+                    <button class="btn-edit-row" title="Edit History Entry" data-history-id="${record.id}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                    </button>
+                    <button class="btn-delete-row" title="Delete History Entry" data-history-id="${record.id}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>
+                </td>`;
+            historyTableBody.appendChild(row);
+        });
+    }
+
+    function updateHistoryCurrentBalance(filter) {
+        let balance = 0;
+        if (filter === 'all') {
+            balance = ledgers.reduce((sum, l) => sum + (parseFloat(l.balance) || 0), 0);
+        } else {
+            const ledger = ledgers.find(l => l.name === filter);
+            balance = ledger ? (parseFloat(ledger.balance) || 0) : 0;
+        }
+        historyCurrentBalanceDisplayEl.textContent = fmtCurrency(balance);
+        if (balance < 0) historyCurrentBalanceDisplayEl.classList.add('negative');
+        else historyCurrentBalanceDisplayEl.classList.remove('negative');
+    }
+
+    function renderLedgerList() {
+        if (ledgers.length === 0) { renderLedgerEmptyState(); return; }
+        ledgerListContainer.innerHTML = '';
+        ledgers.forEach((l, i) => {
+            const isSmartPay = l.name === SMART_PAY_LEDGER_NAME;
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="no-col">${i+1}</td>
+                <td>${l.name}</td>
+                <td>${fmtCurrency(l.balance)}</td>
+                <td class="action-col">
+                    <button class="btn-edit-row" title="Edit Ledger" data-edit-ledger-id="${l.id}" data-edit-ledger-name="${l.name}" data-edit-ledger-balance="${l.balance}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                    </button>
+                    ${isSmartPay ? '' : `
+                    <button class="btn-delete-row" title="Delete Ledger" data-ledger-name="${l.name}" data-ledger-id="${l.id}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>`}
+                </td>`;
+            ledgerListContainer.appendChild(row);
+        });
+    }
+
+    /* ============ HELPER: Selected-date utilities ============ */
+    function getSelectedDateStr() {
+        if (datePicker && datePicker.value) return datePicker.value;
+        const t = new Date();
+        return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    }
+    // ISO timestamp on the selected date (keeps current local time-of-day so ordering stays natural)
+    function getSelectedDateTimeISO() {
+        const [y, m, d] = getSelectedDateStr().split('-').map(Number);
+        const n = new Date();
+        return new Date(y, m - 1, d, n.getHours(), n.getMinutes(), n.getSeconds()).toISOString();
+    }
+
+    /* ============ HELPER: Ledger balance changes ============ */
+    async function deductFromLedger(ledgerName, amount, caption, type, sourceId) {
+        const ledger = ledgers.find(l => l.name === ledgerName);
+        if (!ledger) return;
+        ledger.balance -= amount;
+        const dateStr = getSelectedDateStr();
+        const histEntry = {
+            user_id: currentUser.id, ledger_name: ledgerName, txn_date: dateStr,
+            caption, txn_type: type, amount, balance_after: ledger.balance,
+            is_debit: true, source_id: sourceId
+        };
+        const { data, error } = await sb.from('ledger_history').insert(histEntry).select().single();
+        if (error) { console.error(error); showToast('DB error: ' + error.message, 'error'); return; }
+        await sb.from('ledgers').update({ balance: ledger.balance }).eq('id', ledger.id);
+        ledgerHistory.unshift({
+            id: data.id, date: data.txn_date, ledgerName: data.ledger_name,
+            caption: data.caption, type: data.txn_type, amount: parseFloat(data.amount),
+            balanceAfter: parseFloat(data.balance_after), isDebit: data.is_debit, sourceId: data.source_id
+        });
+        renderLedgerList();
+        updateLedgerDropdowns();
+        updateMultiLedgerTotalDisplay();
+        updateHistoryCurrentBalance(historyLedgerFilter.value);
+    }
+
+    async function creditToLedger(ledgerName, amount, caption, type, sourceId) {
+        const ledger = ledgers.find(l => l.name === ledgerName);
+        if (!ledger) return;
+        ledger.balance += amount;
+        const dateStr = getSelectedDateStr();
+        const histEntry = {
+            user_id: currentUser.id, ledger_name: ledgerName, txn_date: dateStr,
+            caption, txn_type: type, amount, balance_after: ledger.balance,
+            is_debit: false, source_id: sourceId
+        };
+        const { data, error } = await sb.from('ledger_history').insert(histEntry).select().single();
+        if (error) { console.error(error); showToast('DB error: ' + error.message, 'error'); return; }
+        await sb.from('ledgers').update({ balance: ledger.balance }).eq('id', ledger.id);
+        ledgerHistory.unshift({
+            id: data.id, date: data.txn_date, ledgerName: data.ledger_name,
+            caption: data.caption, type: data.txn_type, amount: parseFloat(data.amount),
+            balanceAfter: parseFloat(data.balance_after), isDebit: data.is_debit, sourceId: data.source_id
+        });
+        renderLedgerList();
+        updateLedgerDropdowns();
+        updateMultiLedgerTotalDisplay();
+        updateHistoryCurrentBalance(historyLedgerFilter.value);
+    }
+
+    /* ============ LEDGER TRANSFER SUBMIT ============ */
+    submitLedgerTransferBtn.addEventListener('click', async () => {
+        const fromId = transferFromLedgerSelect.value;
+        const toId = transferToLedgerSelect.value;
+        const amount = parseFloat(transferAmountInput.value) || 0;
+        const caption = transferCaptionInput.value.trim() || 'Ledger Transfer';
+
+        if (!fromId || !toId) { showToast('Please select both ledgers.', 'error'); return; }
+        if (fromId === toId) { showToast('Cannot transfer to the same ledger.', 'error'); return; }
+        if (amount <= 0) { showToast('Please enter a valid amount.', 'error'); return; }
+
+        const fromLedger = ledgers.find(l => l.id === fromId);
+        const toLedger = ledgers.find(l => l.id === toId);
+
+        if (!fromLedger || !toLedger) { showToast('Ledger not found.', 'error'); return; }
+        if (amount > fromLedger.balance) {
+            showToast(`Insufficient balance in "${fromLedger.name}". Available: ${fmtCurrency(fromLedger.balance)}`, 'error');
+            return;
+        }
+
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+        // Deduct from source ledger
+        fromLedger.balance -= amount;
+        const { data: debitData, error: debitError } = await sb.from('ledger_history').insert({
+            user_id: currentUser.id, ledger_name: fromLedger.name, txn_date: dateStr,
+            caption: caption + ' → ' + toLedger.name, txn_type: 'Transfer',
+            amount, balance_after: fromLedger.balance, is_debit: true, source_id: null
+        }).select().single();
+
+        if (debitError) { showToast('DB error: ' + debitError.message, 'error'); return; }
+        await sb.from('ledgers').update({ balance: fromLedger.balance }).eq('id', fromLedger.id);
+        ledgerHistory.unshift({
+            id: debitData.id, date: debitData.txn_date, ledgerName: debitData.ledger_name,
+            caption: debitData.caption, type: debitData.txn_type, amount: parseFloat(debitData.amount),
+            balanceAfter: parseFloat(debitData.balance_after), isDebit: debitData.is_debit, sourceId: debitData.source_id
+        });
+
+        // Credit to destination ledger
+        toLedger.balance += amount;
+        const { data: creditData, error: creditError } = await sb.from('ledger_history').insert({
+            user_id: currentUser.id, ledger_name: toLedger.name, txn_date: dateStr,
+            caption: caption + ' ← ' + fromLedger.name, txn_type: 'Transfer',
+            amount, balance_after: toLedger.balance, is_debit: false, source_id: null
+        }).select().single();
+
+        if (creditError) { showToast('DB error: ' + creditError.message, 'error'); return; }
+        await sb.from('ledgers').update({ balance: toLedger.balance }).eq('id', toLedger.id);
+        ledgerHistory.unshift({
+            id: creditData.id, date: creditData.txn_date, ledgerName: creditData.ledger_name,
+            caption: creditData.caption, type: creditData.txn_type, amount: parseFloat(creditData.amount),
+            balanceAfter: parseFloat(creditData.balance_after), isDebit: creditData.is_debit, sourceId: creditData.source_id
+        });
+
+        renderLedgerList();
+        updateLedgerDropdowns();
+        populateHistoryFilter();
+        updateMultiLedgerTotalDisplay();
+        updateHistoryCurrentBalance(historyLedgerFilter.value);
+        populateTransferSelects();
+
+        transferAmountInput.value = '';
+        closeModal(ledgerTransferModal);
+        showToast(`Transferred ${fmtCurrency(amount)} from "${fromLedger.name}" to "${toLedger.name}"`, 'success');
+    });
+
+    /* ============ HELPER: optional deposit to another ledger ============ */
+    // Returns true if OK to proceed (no deposit requested, or deposit validated).
+    function validateDeposit(checkEl, selectEl, expenseLedgerName) {
+        if (!checkEl.checked) return true;
+        if (!selectEl.value) { showToast('Please select a deposit ledger.', 'error'); return false; }
+        if (selectEl.value === expenseLedgerName) { showToast('Deposit ledger must be different from the expense ledger.', 'error'); return false; }
+        return true;
+    }
+    async function applyDeposit(checkEl, selectEl, amount, caption, expenseLedgerName, sourceId) {
+        if (!checkEl.checked) return;
+        await creditToLedger(selectEl.value, amount, caption + ' ← ' + expenseLedgerName, 'Deposit', sourceId + '-dep');
+    }
+
+    /* ============ SUBMIT HANDLERS ============ */
+    submitExpenseBtn.addEventListener('click', async () => {
+        const caption = expenseCaptionInput.value.trim() || 'Unnamed Expense';
+        const ledgerName = expenseLedgerSelect.value;
+        const amount = parseFloat(expenseAmountInput.value) || 0;
+        const type = expenseTypeSelect.value;
+
+        if (!ledgerName) { showToast('Please select a ledger.', 'error'); return; }
+        const ledger = ledgers.find(l => l.name === ledgerName);
+        if (!ledger) { showToast('Ledger not found.', 'error'); return; }
+        if (ledger.balance <= 0) { showToast(`Ledger "${ledgerName}" has zero balance.`, 'error'); return; }
+        if (amount <= 0) { showToast('Please enter a valid amount.', 'error'); return; }
+        if (amount > ledger.balance) { showToast(`Amount exceeds balance of ${fmtCurrency(ledger.balance)}.`, 'error'); return; }
+        if (!validateDeposit(expenseDepositCheck, expenseDepositSelect, ledgerName)) return;
+
+        const sourceId = 'exp-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
+        const todayStr = getSelectedDateStr();
+        const createdAtISO = getSelectedDateTimeISO();
+
+        const { error } = await sb.from('expenses').insert({
+            user_id: currentUser.id, caption, ledger_name: ledgerName,
+            amount, expense_type: type, source_id: sourceId, created_at: createdAtISO
+        });
+        if (error) { showToast('DB error: ' + error.message, 'error'); return; }
+
+        await deductFromLedger(ledgerName, amount, caption, type, sourceId);
+        await applyDeposit(expenseDepositCheck, expenseDepositSelect, amount, caption, ledgerName, sourceId);
+
+        allExpenses.push({
+            caption, ledger_name: ledgerName, amount, expense_type: type,
+            source_id: sourceId, date: todayStr
+        });
+
+        renderDailyTables();
+        applySearchFilter();
+
+        expenseCaptionInput.value = ''; expenseAmountInput.value = '';
+        resetDepositOptions();
+        closeModal(expenseModal);
+        showToast('Expense added successfully', 'success');
+    });
+
+    submitBankExpenseBtn.addEventListener('click', async () => {
+        const caption = bankExpenseCaptionInput.value.trim() || 'Unnamed Bank Expense';
+        const ledgerName = bankExpenseLedgerSelect.value;
+        const amount = parseFloat(bankExpenseAmountInput.value) || 0;
+
+        if (!ledgerName) { showToast('Please select a ledger.', 'error'); return; }
+        const ledger = ledgers.find(l => l.name === ledgerName);
+        if (!ledger) { showToast('Ledger not found.', 'error'); return; }
+        if (ledger.balance <= 0) { showToast(`Ledger "${ledgerName}" has zero balance.`, 'error'); return; }
+        if (amount <= 0) { showToast('Please enter a valid amount.', 'error'); return; }
+        if (amount > ledger.balance) { showToast(`Amount exceeds balance of ${fmtCurrency(ledger.balance)}.`, 'error'); return; }
+        if (!validateDeposit(bankExpenseDepositCheck, bankExpenseDepositSelect, ledgerName)) return;
+
+        const sourceId = 'bnk-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
+        const todayStr = getSelectedDateStr();
+        const createdAtISO = getSelectedDateTimeISO();
+
+        const { error } = await sb.from('bank_expenses').insert({
+            user_id: currentUser.id, caption, ledger_name: ledgerName, amount, source_id: sourceId, created_at: createdAtISO
+        });
+        if (error) { showToast('DB error: ' + error.message, 'error'); return; }
+
+        await deductFromLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
+        await applyDeposit(bankExpenseDepositCheck, bankExpenseDepositSelect, amount, caption, ledgerName, sourceId);
+
+        allBankExpenses.push({
+            caption, ledger_name: ledgerName, amount, source_id: sourceId, date: todayStr
+        });
+
+        renderDailyTables();
+        applySearchFilter();
+
+        bankExpenseCaptionInput.value = ''; bankExpenseAmountInput.value = '';
+        resetDepositOptions();
+        closeModal(bankExpenseModal);
+        showToast('Bank expense added', 'success');
+    });
+
+    submitSmartPayIncomeBtn.addEventListener('click', async () => {
+        const invoice = smartPayInvoiceInput.value.trim() || 'Unnamed Income';
+        const ledgerName = incomeLedgerSelect.value;
+        const amount = parseFloat(smartPayIncomeAmountInput.value) || 0;
+
+        if (!ledgerName) { showToast('Please select a ledger.', 'error'); return; }
+        if (amount <= 0) { showToast('Please enter a valid amount.', 'error'); return; }
+
+        const ledger = ledgers.find(l => l.name === ledgerName);
+        if (!ledger) { showToast('Ledger not found.', 'error'); return; }
+
+        const sourceId = 'inc-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
+        const todayStr = getSelectedDateStr();
+        const createdAtISO = getSelectedDateTimeISO();
+
+        const { error } = await sb.from('smartpay_income').insert({
+            user_id: currentUser.id, invoice, amount, created_at: createdAtISO
+        });
+        if (error) { showToast('DB error: ' + error.message, 'error'); return; }
+
+        await creditToLedger(ledgerName, amount, invoice, 'Income', sourceId);
+
+        allIncome.push({
+            invoice, amount, source_id: sourceId, date: todayStr
+        });
+
+        renderDailyTables();
+        applySearchFilter();
+
+        smartPayInvoiceInput.value = ''; smartPayIncomeAmountInput.value = '';
+        closeModal(smartPayIncomeModal);
+        showToast(`Income added to "${ledgerName}"`, 'success');
+    });
+
+    submitLedgerBtn.addEventListener('click', async () => {
+        const name = ledgerNameInput.value.trim();
+        const balance = parseFloat(ledgerOpeningBalanceInput.value) || 0;
+        if (!name) { showToast('Please enter a ledger name.', 'error'); return; }
+        if (balance < 0) { showToast('Opening balance cannot be negative.', 'error'); return; }
+        if (ledgers.some(l => l.name === name)) { showToast('Ledger already exists.', 'error'); return; }
+
+        const { data, error } = await sb.from('ledgers').insert({
+            user_id: currentUser.id, name, balance
+        }).select().single();
+        if (error) { showToast('DB error: ' + error.message, 'error'); return; }
+
+        ledgers.push({ id: data.id, name, balance });
+
+        const today = new Date();
+        const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        const { data: hd } = await sb.from('ledger_history').insert({
+            user_id: currentUser.id, ledger_name: name, txn_date: dateStr,
+            caption: 'Opening Balance', txn_type: 'Opening', amount: balance,
+            balance_after: balance, is_debit: false, source_id: null
+        }).select().single();
+        if (hd) {
+            ledgerHistory.unshift({
+                id: hd.id, date: hd.txn_date, ledgerName: hd.ledger_name,
+                caption: hd.caption, type: hd.txn_type, amount: parseFloat(hd.amount),
+                balanceAfter: parseFloat(hd.balance_after), isDebit: hd.is_debit, sourceId: hd.source_id
+            });
+        }
+
+        renderLedgerList();
+        updateLedgerDropdowns();
+        populateHistoryFilter();
+        updateMultiLedgerTotalDisplay();
+        updateHistoryCurrentBalance(historyLedgerFilter.value);
+        ledgerNameInput.value = ''; ledgerOpeningBalanceInput.value = '';
+        ledgerNameInput.focus();
+        showToast('Ledger created', 'success');
+    });
+
+    submitEditLedgerBtn.addEventListener('click', async () => {
+        if (!editingLedgerId) { showToast('No ledger selected.', 'error'); return; }
+        const newName = editLedgerNameInput.value.trim();
+        const newBalance = parseFloat(editLedgerBalanceInput.value) || 0;
+
+        if (!newName) { showToast('Please enter a ledger name.', 'error'); return; }
+        if (newBalance < 0) { showToast('Balance cannot be negative.', 'error'); return; }
+
+        const ledger = ledgers.find(l => l.id === editingLedgerId);
+        if (!ledger) { showToast('Ledger not found.', 'error'); return; }
+
+        if (ledgers.some(l => l.name === newName && l.id !== editingLedgerId)) {
+            showToast('Another ledger with this name already exists.', 'error');
+            return;
+        }
+
+        const oldName = ledger.name;
+        const oldBalance = ledger.balance;
+        const nameChanged = oldName !== newName;
+        const balanceChanged = Math.abs(oldBalance - newBalance) > 0.001;
+
+        if (oldName === SMART_PAY_LEDGER_NAME && nameChanged) {
+            showToast('Smart Pay Ledger name cannot be changed.', 'error');
+            return;
+        }
+
+        const { error } = await sb.from('ledgers').update({
+            name: newName, balance: newBalance
+        }).eq('id', editingLedgerId);
+        if (error) { showToast('DB error: ' + error.message, 'error'); return; }
+
+        if (nameChanged) {
+            await sb.from('ledger_history').update({ ledger_name: newName }).eq('ledger_name', oldName);
+            ledgerHistory.forEach(h => { if (h.ledgerName === oldName) h.ledgerName = newName; });
+        }
+
+        if (balanceChanged) {
+            const diff = newBalance - oldBalance;
+            const isDebit = diff < 0;
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+            const { data: adj } = await sb.from('ledger_history').insert({
+                user_id: currentUser.id, ledger_name: newName, txn_date: dateStr,
+                caption: 'Manual Adjustment', txn_type: 'Adjustment',
+                amount: Math.abs(diff), balance_after: newBalance,
+                is_debit: isDebit, source_id: null
+            }).select().single();
+            if (adj) {
+                ledgerHistory.unshift({
+                    id: adj.id, date: adj.txn_date, ledgerName: adj.ledger_name,
+                    caption: adj.caption, type: adj.txn_type, amount: parseFloat(adj.amount),
+                    balanceAfter: parseFloat(adj.balance_after), isDebit: adj.is_debit, sourceId: adj.source_id
+                });
+            }
+        }
+
+        ledger.name = newName;
+        ledger.balance = newBalance;
+
+        renderLedgerList();
+        updateLedgerDropdowns();
+        populateHistoryFilter();
+        renderHistoryTable();
+        updateMultiLedgerTotalDisplay();
+        calculateTotals();
+
+        editingLedgerId = null;
+        closeModal(editLedgerModal);
+        showToast('Ledger updated successfully', 'success');
+    });
+
+    submitEditHistoryBtn.addEventListener('click', async () => {
+        if (!editingHistoryId) { showToast('No history entry selected.', 'error'); return; }
+
+        const record = ledgerHistory.find(h => String(h.id) === String(editingHistoryId));
+        if (!record) { showToast('History entry not found.', 'error'); return; }
+
+        const newDate = editHistoryDateInput.value;
+        const newLedgerName = editHistoryLedgerSelect.value;
+        const newCaption = editHistoryCaptionInput.value.trim() || 'Transaction';
+        const newType = editHistoryTypeSelect.value;
+        const newAmount = parseFloat(editHistoryAmountInput.value) || 0;
+
+        if (!newDate) { showToast('Please select a date.', 'error'); return; }
+        if (!newLedgerName) { showToast('Please select a ledger.', 'error'); return; }
+        if (newAmount <= 0) { showToast('Please enter a valid amount.', 'error'); return; }
+
+        const oldLedgerName = record.ledgerName;
+        const oldAmount = record.amount;
+        const oldIsDebit = record.isDebit;
+
+        const oldLedger = ledgers.find(l => l.name === oldLedgerName);
+        if (oldLedger) {
+            if (oldIsDebit) oldLedger.balance += oldAmount;
+            else oldLedger.balance -= oldAmount;
+        }
+
+        const newLedger = ledgers.find(l => l.name === newLedgerName);
+        if (!newLedger) { showToast('Ledger not found.', 'error'); return; }
+
+        const newIsDebit = newType === 'Debit';
+        if (newIsDebit) {
+            if (newAmount > newLedger.balance) {
+                if (oldLedger) {
+                    if (oldIsDebit) oldLedger.balance -= oldAmount;
+                    else oldLedger.balance += oldAmount;
+                }
+                showToast(`Debit exceeds balance ${fmtCurrency(newLedger.balance)}.`, 'error');
+                return;
+            }
+            newLedger.balance -= newAmount;
+        } else {
+            newLedger.balance += newAmount;
+        }
+
+        if (oldLedger) await sb.from('ledgers').update({ balance: oldLedger.balance }).eq('id', oldLedger.id);
+        if (newLedger && newLedger.id !== oldLedger?.id) {
+            await sb.from('ledgers').update({ balance: newLedger.balance }).eq('id', newLedger.id);
+        } else if (newLedger && newLedger.id === oldLedger?.id) {
+            await sb.from('ledgers').update({ balance: newLedger.balance }).eq('id', newLedger.id);
+        }
+
+        const { error } = await sb.from('ledger_history').update({
+            ledger_name: newLedgerName,
+            txn_date: newDate,
+            caption: newCaption,
+            txn_type: newType,
+            amount: newAmount,
+            balance_after: newLedger.balance,
+            is_debit: newIsDebit
+        }).eq('id', editingHistoryId);
+        if (error) { showToast('DB error: ' + error.message, 'error'); return; }
+
+        record.ledgerName = newLedgerName;
+        record.date = newDate;
+        record.caption = newCaption;
+        record.type = newType;
+        record.amount = newAmount;
+        record.balanceAfter = newLedger.balance;
+        record.isDebit = newIsDebit;
+
+        renderLedgerList();
+        updateLedgerDropdowns();
+        populateHistoryFilter();
+        renderHistoryTable();
+        updateMultiLedgerTotalDisplay();
+        updateHistoryCurrentBalance(historyLedgerFilter.value);
+        calculateTotals();
+
+        editingHistoryId = null;
+        closeModal(editHistoryModal);
+        showToast('History entry updated', 'success');
+    });
+
+    submitNewTransactionBtn.addEventListener('click', async () => {
+        const ledgerName = txnLedgerSelect.value;
+        const date = txnDateInput.value;
+        const particular = txnParticularInput.value.trim() || 'Transaction';
+        const type = txnTypeSelect.value;
+        const amount = parseFloat(txnAmountInput.value) || 0;
+
+        if (!ledgerName) { showToast('Please select a ledger.', 'error'); return; }
+        if (!date) { showToast('Please select a date.', 'error'); return; }
+        if (amount <= 0) { showToast('Please enter a valid amount.', 'error'); return; }
+
+        const ledger = ledgers.find(l => l.name === ledgerName);
+        if (!ledger) { showToast('Ledger not found.', 'error'); return; }
+        if (type === 'Debit' && amount > ledger.balance) { showToast(`Debit exceeds balance ${fmtCurrency(ledger.balance)}.`, 'error'); return; }
+
+        if (type === 'Credit') ledger.balance += amount;
+        else ledger.balance -= amount;
+
+        const { data, error } = await sb.from('ledger_history').insert({
+            user_id: currentUser.id, ledger_name: ledgerName, txn_date: date,
+            caption: particular, txn_type: type, amount, balance_after: ledger.balance,
+            is_debit: type === 'Debit', source_id: null
+        }).select().single();
+        if (error) { showToast('DB error: ' + error.message, 'error'); return; }
+        await sb.from('ledgers').update({ balance: ledger.balance }).eq('id', ledger.id);
+
+        ledgerHistory.unshift({
+            id: data.id, date: data.txn_date, ledgerName: data.ledger_name,
+            caption: data.caption, type: data.txn_type, amount: parseFloat(data.amount),
+            balanceAfter: parseFloat(data.balance_after), isDebit: data.is_debit, sourceId: data.source_id
+        });
+
+        renderLedgerList();
+        updateLedgerDropdowns();
+        populateHistoryFilter();
+        renderHistoryTable();
+        updateMultiLedgerTotalDisplay();
+        txnParticularInput.value = ''; txnAmountInput.value = '';
+        closeModal(newTransactionModal);
+        showToast('Transaction added', 'success');
+    });
+
+    /* ============ DELETE HANDLERS ============ */
+    // If the deleted expense also deposited into another ledger, take that amount back out.
+    async function reverseDeposit(sourceId) {
+        if (!sourceId) return;
+        const depId = sourceId + '-dep';
+        const dep = ledgerHistory.find(h => h.sourceId === depId);
+        if (!dep) return;
+        await sb.from('ledger_history').delete().eq('source_id', depId);
+        ledgerHistory = ledgerHistory.filter(h => h.sourceId !== depId);
+        await deductFromLedger(dep.ledgerName, dep.amount, 'Delete: ' + dep.caption, 'Reversal', null);
+    }
+
+    expenseTableBody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.btn-delete-row'); if (!btn) return;
+        const row = btn.closest('tr');
+        const amount = parseFloat(row.dataset.amount) || 0;
+        const ledgerName = row.dataset.ledgerName;
+        const caption = row.dataset.caption || 'Deleted Expense';
+        const type = row.dataset.type || 'General';
+        const sourceId = row.dataset.sourceId;
+
+        if (sourceId) {
+            await sb.from('expenses').delete().eq('source_id', sourceId);
+            await sb.from('ledger_history').delete().eq('source_id', sourceId);
+        }
+        if (ledgerName) await creditToLedger(ledgerName, amount, caption, type, sourceId);
+        await reverseDeposit(sourceId);
+
+        allExpenses = allExpenses.filter(e => e.source_id !== sourceId);
+
+        renderDailyTables();
+        applySearchFilter();
+        renderHistoryTable();
+        showToast('Expense deleted', 'success');
+    });
+
+    bankExpenseTableBody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.btn-delete-row'); if (!btn) return;
+        const row = btn.closest('tr');
+        const amount = parseFloat(row.dataset.amount) || 0;
+        const ledgerName = row.dataset.ledgerName;
+        const caption = row.dataset.caption || 'Deleted Bank Expense';
+        const sourceId = row.dataset.sourceId;
+
+        if (sourceId) {
+            await sb.from('bank_expenses').delete().eq('source_id', sourceId);
+            await sb.from('ledger_history').delete().eq('source_id', sourceId);
+        }
+        if (ledgerName) await creditToLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
+        await reverseDeposit(sourceId);
+
+        allBankExpenses = allBankExpenses.filter(e => e.source_id !== sourceId);
+
+        renderDailyTables();
+        applySearchFilter();
+        renderHistoryTable();
+        showToast('Bank expense deleted', 'success');
+    });
+
+    smartPayIncomeTableBody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.btn-delete-row'); if (!btn) return;
+        const row = btn.closest('tr');
+        const amount = parseFloat(row.dataset.amount) || 0;
+        const invoice = row.cells[0].textContent;
+        const sourceId = row.dataset.sourceId;
+
+        let ledgerName = SMART_PAY_LEDGER_NAME;
+        if (sourceId) {
+            const histRec = ledgerHistory.find(h => h.sourceId === sourceId);
+            if (histRec) ledgerName = histRec.ledgerName;
+        }
+
+        await sb.from('smartpay_income').delete().eq('invoice', invoice).eq('amount', amount);
+
+        if (sourceId) {
+            await sb.from('ledger_history').delete().eq('source_id', sourceId);
+        }
+
+        const targetLedger = ledgers.find(l => l.name === ledgerName);
+        if (targetLedger) {
+            targetLedger.balance -= amount;
+            await sb.from('ledgers').update({ balance: targetLedger.balance }).eq('id', targetLedger.id);
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+            await sb.from('ledger_history').insert({
+                user_id: currentUser.id, ledger_name: ledgerName, txn_date: dateStr,
+                caption: 'Delete: ' + invoice, txn_type: 'Reversal', amount,
+                balance_after: targetLedger.balance, is_debit: true, source_id: null
+            });
+        }
+
+        allIncome = allIncome.filter(e => e.source_id !== sourceId);
+
+        renderDailyTables();
+        applySearchFilter();
+        renderLedgerList();
+        updateLedgerDropdowns();
+        updateMultiLedgerTotalDisplay();
+        updateHistoryCurrentBalance(historyLedgerFilter.value);
+        showToast(`Income deleted (reversed from "${ledgerName}")`, 'success');
+    });
+
+    ledgerListContainer.addEventListener('click', async (e) => {
+        const editBtn = e.target.closest('.btn-edit-row');
+        if (editBtn) {
+            editingLedgerId = editBtn.dataset.editLedgerId;
+            editLedgerNameInput.value = editBtn.dataset.editLedgerName;
+            editLedgerBalanceInput.value = editBtn.dataset.editLedgerBalance;
+            openModal(editLedgerModal);
+            editLedgerNameInput.focus();
+            editLedgerNameInput.select();
+            return;
+        }
+
+        const deleteBtn = e.target.closest('.btn-delete-row');
+        if (deleteBtn) {
+            const ledgerName = deleteBtn.dataset.ledgerName;
+            const ledgerId = deleteBtn.dataset.ledgerId;
+            if (ledgerName === SMART_PAY_LEDGER_NAME) {
+                showToast('Smart Pay Ledger cannot be deleted.', 'error');
+                return;
+            }
+            if (!confirm(`Delete ledger "${ledgerName}"? This will remove all its history.`)) return;
+
+            await sb.from('ledgers').delete().eq('id', ledgerId);
+            await sb.from('ledger_history').delete().eq('ledger_name', ledgerName);
+
+            ledgers = ledgers.filter(l => l.id !== ledgerId);
+            ledgerHistory = ledgerHistory.filter(h => h.ledgerName !== ledgerName);
+
+            const hadInMulti = multiLedgerIds.includes(ledgerId);
+            multiLedgerIds = multiLedgerIds.filter(id => id !== ledgerId);
+            if (hadInMulti) await saveMultiLedgerSettings();
+
+            renderLedgerList();
+            updateLedgerDropdowns();
+            populateHistoryFilter();
+            renderHistoryTable();
+            updateMultiLedgerTotalDisplay();
+            showToast('Ledger deleted', 'success');
+        }
+    });
+
+    historyTableBody.addEventListener('click', async (e) => {
+        const editBtn = e.target.closest('.btn-edit-row');
+        if (editBtn) {
+            const id = editBtn.dataset.historyId;
+            const record = ledgerHistory.find(h => String(h.id) === String(id));
+            if (!record) return;
+
+            editingHistoryId = id;
+
+            editHistoryDateInput.value = record.date;
+            editHistoryCaptionInput.value = record.caption;
+            editHistoryTypeSelect.value = record.isDebit ? 'Debit' : 'Credit';
+            editHistoryAmountInput.value = record.amount;
+
+            editHistoryLedgerSelect.innerHTML = '';
+            ledgers.forEach(l => {
+                const o = document.createElement('option');
+                o.value = l.name;
+                o.textContent = `${l.name} (${fmtCurrency(l.balance)})`;
+                editHistoryLedgerSelect.appendChild(o);
+            });
+            editHistoryLedgerSelect.value = record.ledgerName;
+
+            populateParticularList();
+            openModal(editHistoryModal);
+            editHistoryCaptionInput.focus();
+            editHistoryCaptionInput.select();
+            return;
+        }
+
+        const btn = e.target.closest('.btn-delete-row'); if (!btn) return;
+        const id = btn.dataset.historyId;
+        const record = ledgerHistory.find(h => String(h.id) === String(id));
+        if (!record) return;
+        if (!confirm(`Delete history entry? "${record.caption}" - ${fmtCurrency(record.amount)}`)) return;
+
+        const ledger = ledgers.find(l => l.name === record.ledgerName);
+        if (ledger) {
+            if (record.isDebit) ledger.balance += record.amount;
+            else ledger.balance -= record.amount;
+            await sb.from('ledgers').update({ balance: ledger.balance }).eq('id', ledger.id);
+        }
+        await sb.from('ledger_history').delete().eq('id', id);
+
+        if (record.sourceId) {
+            await sb.from('expenses').delete().eq('source_id', record.sourceId);
+            await sb.from('bank_expenses').delete().eq('source_id', record.sourceId);
+
+            allExpenses = allExpenses.filter(e => e.source_id !== record.sourceId);
+            allBankExpenses = allBankExpenses.filter(e => e.source_id !== record.sourceId);
+            allIncome = allIncome.filter(e => e.source_id !== record.sourceId);
+        }
+
+        ledgerHistory = ledgerHistory.filter(h => String(h.id) !== String(id));
+        renderLedgerList();
+        updateLedgerDropdowns();
+        populateHistoryFilter();
+        renderHistoryTable();
+        renderDailyTables();
+        updateMultiLedgerTotalDisplay();
+        applySearchFilter();
+        showToast('History entry deleted', 'success');
+    });
+
+    /* ============ DISPLAYS / CALC ============ */
+    function updateMultiLedgerTotalDisplay() {
+        const selected = ledgers.filter(l => multiLedgerIds.includes(l.id));
+        const total = selected.reduce((sum, l) => sum + (parseFloat(l.balance) || 0), 0);
+        headerMultiLedgerTotalEl.textContent = fmtCurrency(total);
+        if (total < 0) headerMultiLedgerTotalEl.classList.add('negative');
+        else headerMultiLedgerTotalEl.classList.remove('negative');
+    }
+
+    function calculateTotals() {
+        let grandTotal = 0;
+        denomInputs.forEach(input => {
+            const cv = parseFloat(input.getAttribute('data-currency')) || 0;
+            const count = parseFloat(input.value) || 0;
+            const total = cv * count;
+            input.closest('tr').querySelector('.row-total').textContent = fmtCurrency(total);
+            grandTotal += total;
+        });
+        denomGrandTotalEl.textContent = fmtCurrency(grandTotal);
+        totalCashInput.value = fmtCurrency(grandTotal);
+
+        const opening = parseFloat(openingInput.value) || 0;
+        const others = parseFloat(othersInput.value) || 0;
+        totalBillInput.value = fmtCurrency(opening + others);
+
+        // SHIFT CASH RESULT: Total Bill − Cash Expense − Cash Count Total (grandTotal)
+        const result = (opening + others) - totalExpenseAmount - grandTotal;
+        if (Math.abs(result) < 0.001) {
+            shiftCashResultEl.textContent = 'Tally';
+            shiftCashResultEl.classList.add('tally');
+        } else {
+            shiftCashResultEl.textContent = fmtCurrency(result);
+            shiftCashResultEl.classList.remove('tally');
+        }
+        expenceInput.value = fmtCurrency(totalExpenseAmount);
+    }
+
+    denomInputs.forEach(i => {
+        i.addEventListener('input', () => { calculateTotals(); scheduleAutoSave(); });
+        i.addEventListener('change', () => { calculateTotals(); scheduleAutoSave(); });
+    });
+    openingInput.addEventListener('input', () => { calculateTotals(); scheduleAutoSave(); });
+    othersInput.addEventListener('input', () => { calculateTotals(); scheduleAutoSave(); });
+
+    clearOpeningBtn.addEventListener('click', async () => {
+        if (!currentUser) { showToast('Not logged in.', 'error'); return; }
+        const dateVal = datePicker.value;
+        if (!dateVal) { showToast('Select a date first.', 'error'); return; }
+
+        clearOpeningBtn.disabled = true;
+        try {
+            // Most recent saved day before the selected date
+            const { data, error } = await sb.from(DAILY_TABLE)
+                .select('record_date, opening, others, denominations')
+                .eq('user_id', currentUser.id)
+                .lt('record_date', dateVal)
+                .order('record_date', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (error) { console.error(error); showToast('Could not load previous closing.', 'error'); return; }
+            if (!data) { showToast('No previous day record found.', 'error'); return; }
+
+            // Closing balance = cash count total (denominations x counts) of that day
+            const denoms = data.denominations || [];
+            let closing = 0;
+            denomListFor(denoms).forEach((cv, i) => {
+                closing += cv * (parseFloat(denoms[i]) || 0);
+            });
+
+            // If that day's Total Cash is 0, closing = Total Bill - Expense
+            if (closing === 0) {
+                const totalBill = (parseFloat(data.opening) || 0) + (parseFloat(data.others) || 0);
+                const prevExpense = allExpenses
+                    .filter(e => e.date === data.record_date)
+                    .reduce((sum, e) => sum + e.amount, 0);
+                closing = totalBill - prevExpense;
+            }
+
+            openingInput.value = closing || '';
+            calculateTotals(); scheduleAutoSave();
+            showToast('Opening set to closing of ' + data.record_date + ': ' + fmtCurrency(closing), 'success');
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        } finally {
+            clearOpeningBtn.disabled = false;
+        }
+    });
+    openingInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); othersInput.focus(); othersInput.select(); }
+    });
+    othersInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); const f = document.querySelector('.denom-input'); if (f) { f.focus(); f.select(); } }
+    });
+    denomInputs.forEach((input, idx) => {
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const next = denomInputs[(idx+1) % denomInputs.length];
+                next.focus(); next.select();
+            }
+        });
+    });
+    refreshBtn.addEventListener('click', () => {
+        denomInputs.forEach(i => i.value = '');
+        denomGrandTotalEl.textContent = '0.00';
+        totalCashInput.value = '0.00';
+        document.querySelectorAll('.row-total').forEach(el => el.textContent = '0.00');
+        calculateTotals();
+        scheduleAutoSave();
+    });
+
+    /* ============ SAVE CHANGES ============ */
+    saveChangesBtn.addEventListener('click', async () => {
+        if (!currentUser) { showToast('Not logged in.', 'error'); return; }
+        try {
+            const saved = await saveDailyData();
+            if (saved) {
+                calculateTotals();
+                const orig = saveChangesBtn.textContent;
+                saveChangesBtn.textContent = '✓ Saved!';
+                saveChangesBtn.style.backgroundColor = 'var(--accent-green)';
+                saveChangesBtn.style.borderColor = 'var(--accent-green)';
+                setTimeout(() => {
+                    saveChangesBtn.textContent = orig;
+                    saveChangesBtn.style.backgroundColor = '';
+                    saveChangesBtn.style.borderColor = '';
+                }, 1500);
+                showToast('Daily data saved to database', 'success');
+            } else {
+                showToast('Error saving to database', 'error');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    });
+
+    /* ============ CLOSE MENU SAVE CHANGES ============ */
+    document.getElementById('closeMenuSaveChanges').addEventListener('click', async () => {
+        if (!currentUser) { showToast('Not logged in.', 'error'); return; }
+        try {
+            const saved = await saveDailyData();
+            if (saved) {
+                calculateTotals();
+                showToast('Daily data saved to database', 'success');
+            } else {
+                showToast('Error saving to database', 'error');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    });
+
+    /* ============ AUTO-CAPITALIZE FIRST LETTER ============ */
+    // Only the first letter of what you type in a text box is made a capital; the rest stays exactly as typed.
+    // Email and password fields are left alone so login keeps working. Add data-keep-case to any box that should stay as typed.
+    document.addEventListener('input', e => {
+        const el = e.target;
+        if (!el || e.isComposing) return;
+        const isText = el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'search'));
+        if (!isText || el.readOnly || el.hasAttribute('data-keep-case')) return;
+        const v = el.value;
+        const i = v.search(/\S/);                       // first non-space character
+        if (i < 0) return;
+        const first = v.charAt(i), up = first.toUpperCase();
+        if (first === up) return;
+        const start = el.selectionStart, end = el.selectionEnd;
+        el.value = v.slice(0, i) + up + v.slice(i + 1);
+        try { el.setSelectionRange(start, end); } catch (err) { /* not supported for this input type */ }
+    });
+
+    /* ============ STOP MOUSE WHEEL CHANGING NUMBER BOXES ============ */
+    // Scrolling the wheel over a focused number box (currency counts, amounts) no longer changes its value.
+    document.addEventListener('wheel', e => {
+        const el = e.target;
+        if (el && el.tagName === 'INPUT' && el.type === 'number' && document.activeElement === el) el.blur();
+    }, { capture: true, passive: true });
+
+    /* ============ EXPIRY INFO ============ */
+    const expiryModal = document.getElementById('expiryModal');
+    const expiryListEl = document.getElementById('expiryList');
+    const headerNextExpiryLine = document.getElementById('headerNextExpiryLine');
+    const headerNextExpiryEl = document.getElementById('headerNextExpiry');
+
+    const EXPIRY_TABLE = 'expiry_items';
+    let expiryItems = [];
+
+    function loadExpiryItems() { return expiryItems; }
+
+    function legacyExpiryKey() { return 'expiry_items_' + (currentUser ? currentUser.id : 'guest'); }
+
+    // Load from database; on first run, move any entries saved earlier in this browser into the database.
+    async function loadExpiryFromDb() {
+        if (!currentUser) return;
+        const { data, error } = await sb.from(EXPIRY_TABLE)
+            .select('id, name, expiry_date')
+            .eq('user_id', currentUser.id)
+            .order('expiry_date');
+        if (error) { console.error('Load expiry error:', error); showToast('Could not load expiry info.', 'error'); return; }
+        expiryItems = (data || []).map(r => ({ id: r.id, name: r.name, date: r.expiry_date }));
+
+        try {
+            const raw = localStorage.getItem(legacyExpiryKey());
+            if (raw) {
+                const old = JSON.parse(raw);
+                const rows = (Array.isArray(old) ? old : [])
+                    .filter(o => o && o.name && o.date && !expiryItems.some(e => e.name === o.name && e.date === o.date))
+                    .map(o => ({ id: 'e' + Date.now() + Math.random().toString(36).slice(2, 7), user_id: currentUser.id, name: o.name, expiry_date: o.date }));
+                if (rows.length) {
+                    const { error: mErr } = await sb.from(EXPIRY_TABLE).insert(rows);
+                    if (mErr) { console.error('Expiry migration error:', mErr); return; }
+                    expiryItems = expiryItems.concat(rows.map(r => ({ id: r.id, name: r.name, date: r.expiry_date })));
+                }
+                localStorage.removeItem(legacyExpiryKey());
+            }
+        } catch (e) { console.error('Expiry migration error:', e); }
+    }
+
+    async function addExpiryItem(name, date) {
+        const item = { id: 'e' + Date.now() + Math.random().toString(36).slice(2, 7), name, date };
+        const { error } = await sb.from(EXPIRY_TABLE).insert({ id: item.id, user_id: currentUser.id, name, expiry_date: date });
+        if (error) { console.error('Add expiry error:', error); showToast('Could not save expiry info.', 'error'); return false; }
+        expiryItems.push(item);
+        return true;
+    }
+
+    async function removeExpiryItem(id) {
+        const { error } = await sb.from(EXPIRY_TABLE).delete().eq('id', id).eq('user_id', currentUser.id);
+        if (error) { console.error('Delete expiry error:', error); showToast('Could not remove expiry info.', 'error'); return false; }
+        expiryItems = expiryItems.filter(i => i.id !== id);
+        return true;
+    }
+    function expiryDaysLeft(dateStr) {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const d = new Date(dateStr + 'T00:00:00');
+        return Math.round((d - today) / 86400000);
+    }
+    function expiryLabel(days) {
+        if (days < 0) return `Expired ${-days} day${days === -1 ? '' : 's'} ago`;
+        if (days === 0) return 'Expires today';
+        return `${days} day${days === 1 ? '' : 's'} left`;
+    }
+    function expiryColor(days, onDark) {
+        if (days <= 7) return onDark ? '#f87171' : '#dc2626';   // red: 7 days or less / expired
+        if (days <= 30) return onDark ? '#fb923c' : '#ea580c';  // orange: 8-30 days
+        return onDark ? '#4ade80' : '#16a34a';                  // green: more than 30 days
+    }
+    function expiryEsc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+    function fmtExpiryDate(dateStr) {
+        const d = new Date(dateStr + 'T00:00:00');
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function updateNextExpiryHeader() {
+        const items = loadExpiryItems().filter(i => expiryDaysLeft(i.date) >= 0).sort((a, b) => a.date.localeCompare(b.date));
+        if (!items.length) { headerNextExpiryLine.style.display = 'none'; return; }
+        const n = items[0], days = expiryDaysLeft(n.date);
+        headerNextExpiryEl.innerHTML = `${expiryEsc(n.name)} - ${fmtExpiryDate(n.date)} <span style="color:${expiryColor(days, true)}; text-shadow:none;">(${expiryLabel(days)})</span>`;
+        headerNextExpiryLine.style.display = '';
+    }
+
+    function renderExpiryList() {
+        const items = loadExpiryItems().sort((a, b) => a.date.localeCompare(b.date));
+        if (!items.length) { expiryListEl.innerHTML = '<div style="font-size:13px; color:var(--text-muted);">No expiry dates added yet.</div>'; return; }
+        expiryListEl.innerHTML = items.map(i => {
+            const days = expiryDaysLeft(i.date);
+            const color = expiryColor(days, false);
+            return `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; border:1px solid var(--border-color); border-radius:8px; font-size:13px;">
+                <div><div style="font-weight:600;">${expiryEsc(i.name)}</div>
+                <div style="color:var(--text-muted);">${fmtExpiryDate(i.date)} · <span style="color:${color}; font-weight:600;">${expiryLabel(days)}</span></div></div>
+                <button class="modal-close" data-expiry-del="${i.id}" title="Remove">&times;</button></div>`;
+        }).join('');
+    }
+
+    document.getElementById('openExpiryModal').addEventListener('click', () => { renderExpiryList(); openModal(expiryModal); });
+    document.getElementById('closeExpiryModal').addEventListener('click', () => closeModal(expiryModal));
+    document.getElementById('closeExpiryBtn').addEventListener('click', () => closeModal(expiryModal));
+    expiryModal.addEventListener('click', e => { if (e.target === expiryModal) closeModal(expiryModal); });
+    document.getElementById('addExpiryBtn').addEventListener('click', async () => {
+        const name = document.getElementById('expiryName').value.trim();
+        const date = document.getElementById('expiryDate').value;
+        if (!name || !date) { showToast('Please enter a name and expiry date.', 'error'); return; }
+        if (!(await addExpiryItem(name, date))) return;
+        document.getElementById('expiryName').value = ''; document.getElementById('expiryDate').value = '';
+        renderExpiryList(); updateNextExpiryHeader();
+    });
+    expiryListEl.addEventListener('click', async e => {
+        const id = e.target.getAttribute && e.target.getAttribute('data-expiry-del');
+        if (!id) return;
+        if (!(await removeExpiryItem(id))) return;
+        renderExpiryList(); updateNextExpiryHeader();
+    });
+    updateNextExpiryHeader();
+
+    /* ============ HELP MENU ABOUT ============ */
+    const aboutModal = document.getElementById('aboutModal');
+    document.getElementById('helpMenuAbout').addEventListener('click', () => openModal(aboutModal));
+    document.getElementById('closeAboutModal').addEventListener('click', () => closeModal(aboutModal));
+    document.getElementById('closeAboutBtn').addEventListener('click', () => closeModal(aboutModal));
+    aboutModal.addEventListener('click', e => { if (e.target === aboutModal) closeModal(aboutModal); });
+
+    /* ============ SEARCH ============ */
+    function applySearchFilter() {
+        searchTerm = searchInput.value.trim().toLowerCase();
+        [expenseTableBody, bankExpenseTableBody, smartPayIncomeTableBody].forEach(tbody => {
+            tbody.querySelectorAll('tr').forEach(row => {
+                if (row.classList.contains('empty-row')) return;
+                const text = row.textContent.toLowerCase();
+                row.style.display = (searchTerm === '' || text.includes(searchTerm)) ? '' : 'none';
+            });
+        });
+    }
+    searchInput.addEventListener('input', applySearchFilter);
+
+    /* ============ CALCULATOR ============ */
+    let calcCurrentValue = '0', calcPreviousValue = null, calcOperation = null, calcShouldReset = false;
+    function updateCalcDisplay() { calcDisplay.textContent = calcCurrentValue; }
+    function calcInputNumber(n) {
+        if (calcShouldReset) { calcCurrentValue = n; calcShouldReset = false; }
+        else calcCurrentValue = (calcCurrentValue === '0') ? n : calcCurrentValue + n;
+        updateCalcDisplay();
+    }
+    function calcInputDecimal() {
+        if (calcShouldReset) { calcCurrentValue = '0.'; calcShouldReset = false; }
+        else if (!calcCurrentValue.includes('.')) calcCurrentValue += '.';
+        updateCalcDisplay();
+    }
+    function calcClear() { calcCurrentValue = '0'; calcPreviousValue = null; calcOperation = null; calcShouldReset = false; updateCalcDisplay(); }
+    function calcBackspace() {
+        calcCurrentValue = calcCurrentValue.length <= 1 ? '0' : calcCurrentValue.slice(0,-1);
+        updateCalcDisplay();
+    }
+    function calcPercent() { calcCurrentValue = String((parseFloat(calcCurrentValue)||0)/100); updateCalcDisplay(); }
+    function performCalc(p, c, op) {
+        switch(op) {
+            case 'add': return p + c;
+            case 'subtract': return p - c;
+            case 'multiply': return p * c;
+            case 'divide': return c !== 0 ? p / c : 0;
+        }
+        return c;
+    }
+    function calcOperationHandler(op) {
+        const cur = parseFloat(calcCurrentValue);
+        if (calcPreviousValue !== null && calcOperation && !calcShouldReset) {
+            const r = performCalc(calcPreviousValue, cur, calcOperation);
+            calcCurrentValue = String(r); updateCalcDisplay(); calcPreviousValue = r;
+        } else calcPreviousValue = cur;
+        calcOperation = op; calcShouldReset = true;
+    }
+    function calcEquals() {
+        const cur = parseFloat(calcCurrentValue);
+        if (calcPreviousValue !== null && calcOperation) {
+            calcCurrentValue = String(performCalc(calcPreviousValue, cur, calcOperation));
+            calcPreviousValue = null; calcOperation = null; calcShouldReset = true;
+            updateCalcDisplay();
+        }
+    }
+    document.querySelectorAll('.calc-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const a = this.dataset.action;
+            if (a === 'num') calcInputNumber(this.dataset.value);
+            else if (a === 'decimal') calcInputDecimal();
+            else if (a === 'clear') calcClear();
+            else if (a === 'backspace') calcBackspace();
+            else if (a === 'percent') calcPercent();
+            else if (['add','subtract','multiply','divide'].includes(a)) calcOperationHandler(a);
+            else if (a === 'equals') calcEquals();
+        });
+    });
+    calculatorBtn.addEventListener('click', () => calculatorWindow.classList.add('active'));
+    closeCalculatorBtn.addEventListener('click', () => calculatorWindow.classList.remove('active'));
+
+    let isDragging = false, dragOffsetX = 0, dragOffsetY = 0;
+    calcTitlebar.addEventListener('mousedown', e => {
+        if (e.target.closest('.calc-titlebar-btn')) return;
+        isDragging = true;
+        const r = calculatorWindow.getBoundingClientRect();
+        dragOffsetX = e.clientX - r.left; dragOffsetY = e.clientY - r.top;
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+        if (!isDragging) return;
+        calculatorWindow.style.left = (e.clientX - dragOffsetX) + 'px';
+        calculatorWindow.style.top = (e.clientY - dragOffsetY) + 'px';
+    });
+    document.addEventListener('mouseup', () => isDragging = false);
+
+    updateCalcDisplay();
+    calculateTotals();
+
+    renderExpenseEmptyState();
+    renderBankExpenseEmptyState();
+    renderSmartPayIncomeEmptyState();
+    renderLedgerEmptyState();
+});
+</script>
+
+</body>
+</html>
