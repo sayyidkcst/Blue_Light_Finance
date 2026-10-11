@@ -815,6 +815,10 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                     Profile
                 </div>
+                <div class="sub-menu-item" id="openExpiryModal">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    Expiry Info
+                </div>
             </div>
         </div>
         <div class="menu-item">
@@ -836,6 +840,7 @@
         <div class="header-center">
             <div class="text-red">Total Expenses : <span id="headerTotalExpenses">0.00</span></div>
             <div class="multi-ledger-line">Savings : <span class="value" id="headerMultiLedgerTotal">0.00</span></div>
+            <div class="multi-ledger-line" id="headerNextExpiryLine" style="display:none; font-size:12px;"><span class="value" id="headerNextExpiry" style="font-size:13px;"></span></div>
         </div>
         <div class="header-right">
             <div class="user-name" id="currentUser">USER</div>
@@ -1362,6 +1367,30 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="expiryModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Expiry Info</h3>
+            <button class="modal-close" id="closeExpiryModal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-form-group">
+                <label for="expiryName">Name</label>
+                <input type="text" id="expiryName" placeholder="e.g. License, Insurance, Domain">
+            </div>
+            <div class="modal-form-group">
+                <label for="expiryDate">Expiry Date</label>
+                <input type="date" id="expiryDate">
+            </div>
+            <button class="modal-btn modal-btn-submit" id="addExpiryBtn" style="margin-top:4px;">Add</button>
+            <div id="expiryList" style="margin-top:16px; display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-cancel" id="closeExpiryBtn">Close</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal-overlay" id="aboutModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -1485,6 +1514,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     function showApp(user) {
         currentUser = user;
+        try { updateNextExpiryHeader(); } catch (e) { /* expiry UI not ready yet */ }
         authScreen.classList.add('hidden');
         appContainer.classList.remove('hidden');
         const displayName = user.user_metadata?.username || user.email?.split('@')[0] || 'USER';
@@ -3810,6 +3840,84 @@ document.addEventListener('DOMContentLoaded', function() {
             showToast('Error: ' + err.message, 'error');
         }
     });
+
+    /* ============ EXPIRY INFO ============ */
+    const expiryModal = document.getElementById('expiryModal');
+    const expiryListEl = document.getElementById('expiryList');
+    const headerNextExpiryLine = document.getElementById('headerNextExpiryLine');
+    const headerNextExpiryEl = document.getElementById('headerNextExpiry');
+
+    function expiryKey() { return 'expiry_items_' + (currentUser ? currentUser.id : 'guest'); }
+    function loadExpiryItems() {
+        try { const v = JSON.parse(localStorage.getItem(expiryKey()) || '[]'); return Array.isArray(v) ? v : []; }
+        catch (e) { return []; }
+    }
+    function saveExpiryItems(items) {
+        try { localStorage.setItem(expiryKey(), JSON.stringify(items)); } catch (e) { showToast('Could not save expiry info.', 'error'); }
+    }
+    function expiryDaysLeft(dateStr) {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const d = new Date(dateStr + 'T00:00:00');
+        return Math.round((d - today) / 86400000);
+    }
+    function expiryLabel(days) {
+        if (days < 0) return `Expired ${-days} day${days === -1 ? '' : 's'} ago`;
+        if (days === 0) return 'Expires today';
+        return `${days} day${days === 1 ? '' : 's'} left`;
+    }
+    function expiryColor(days, onDark) {
+        if (days <= 7) return onDark ? '#f87171' : '#dc2626';   // red: 7 days or less / expired
+        if (days <= 30) return onDark ? '#fb923c' : '#ea580c';  // orange: 8-30 days
+        return onDark ? '#4ade80' : '#16a34a';                  // green: more than 30 days
+    }
+    function expiryEsc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+    function fmtExpiryDate(dateStr) {
+        const d = new Date(dateStr + 'T00:00:00');
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function updateNextExpiryHeader() {
+        const items = loadExpiryItems().filter(i => expiryDaysLeft(i.date) >= 0).sort((a, b) => a.date.localeCompare(b.date));
+        if (!items.length) { headerNextExpiryLine.style.display = 'none'; return; }
+        const n = items[0], days = expiryDaysLeft(n.date);
+        headerNextExpiryEl.innerHTML = `${expiryEsc(n.name)} - ${fmtExpiryDate(n.date)} <span style="color:${expiryColor(days, true)}; text-shadow:none;">(${expiryLabel(days)})</span>`;
+        headerNextExpiryLine.style.display = '';
+    }
+
+    function renderExpiryList() {
+        const items = loadExpiryItems().sort((a, b) => a.date.localeCompare(b.date));
+        if (!items.length) { expiryListEl.innerHTML = '<div style="font-size:13px; color:var(--text-muted);">No expiry dates added yet.</div>'; return; }
+        expiryListEl.innerHTML = items.map(i => {
+            const days = expiryDaysLeft(i.date);
+            const color = expiryColor(days, false);
+            return `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; border:1px solid var(--border-color); border-radius:8px; font-size:13px;">
+                <div><div style="font-weight:600;">${expiryEsc(i.name)}</div>
+                <div style="color:var(--text-muted);">${fmtExpiryDate(i.date)} · <span style="color:${color}; font-weight:600;">${expiryLabel(days)}</span></div></div>
+                <button class="modal-close" data-expiry-del="${i.id}" title="Remove">&times;</button></div>`;
+        }).join('');
+    }
+
+    document.getElementById('openExpiryModal').addEventListener('click', () => { renderExpiryList(); openModal(expiryModal); });
+    document.getElementById('closeExpiryModal').addEventListener('click', () => closeModal(expiryModal));
+    document.getElementById('closeExpiryBtn').addEventListener('click', () => closeModal(expiryModal));
+    expiryModal.addEventListener('click', e => { if (e.target === expiryModal) closeModal(expiryModal); });
+    document.getElementById('addExpiryBtn').addEventListener('click', () => {
+        const name = document.getElementById('expiryName').value.trim();
+        const date = document.getElementById('expiryDate').value;
+        if (!name || !date) { showToast('Please enter a name and expiry date.', 'error'); return; }
+        const items = loadExpiryItems();
+        items.push({ id: 'e' + Date.now(), name, date });
+        saveExpiryItems(items);
+        document.getElementById('expiryName').value = ''; document.getElementById('expiryDate').value = '';
+        renderExpiryList(); updateNextExpiryHeader();
+    });
+    expiryListEl.addEventListener('click', e => {
+        const id = e.target.getAttribute && e.target.getAttribute('data-expiry-del');
+        if (!id) return;
+        saveExpiryItems(loadExpiryItems().filter(i => i.id !== id));
+        renderExpiryList(); updateNextExpiryHeader();
+    });
+    updateNextExpiryHeader();
 
     /* ============ HELP MENU ABOUT ============ */
     const aboutModal = document.getElementById('aboutModal');
