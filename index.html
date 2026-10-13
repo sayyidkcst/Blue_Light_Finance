@@ -1056,8 +1056,7 @@
     <div class="modal-content">
         <div class="modal-header"><h3>Manage Ledgers</h3><button class="modal-close" id="closeLedgerModal">&times;</button></div>
         <div class="modal-body">
-            <div class="modal-form-group"><label for="ledgerName">Ledger Name</label><input type="text" id="ledgerName" placeholder="e.g., Cash Book"></div>
-            <div class="modal-form-group"><label for="ledgerOpeningBalance">Opening Balance</label><input type="number" id="ledgerOpeningBalance" placeholder="0.00"></div>
+            <button class="modal-btn modal-btn-submit" id="openNewLedgerModal" style="align-self:flex-start;">+ New Ledger</button>
             <div style="font-size: 14px; font-weight: 600; color: var(--text-muted); margin-top: 10px;">Existing Ledgers</div>
             <div class="ledger-table-container">
                 <table class="ledger-table">
@@ -1067,7 +1066,20 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="modal-btn modal-btn-cancel" id="cancelLedger">Cancel</button>
+            <button class="modal-btn modal-btn-cancel" id="cancelLedger">Close</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="newLedgerModal">
+    <div class="modal-content">
+        <div class="modal-header"><h3>New Ledger</h3><button class="modal-close" id="closeNewLedgerModal">&times;</button></div>
+        <div class="modal-body">
+            <div class="modal-form-group"><label for="ledgerName">Ledger Name</label><input type="text" id="ledgerName" placeholder="e.g., Cash Book"></div>
+            <div class="modal-form-group"><label for="ledgerOpeningBalance">Opening Balance</label><input type="number" id="ledgerOpeningBalance" placeholder="0.00"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-cancel" id="cancelNewLedger">Cancel</button>
             <button class="modal-btn modal-btn-submit" id="submitLedger">Add Ledger</button>
         </div>
     </div>
@@ -1907,22 +1919,6 @@ document.addEventListener('DOMContentLoaded', function() {
     /* ============================================================
        SUPABASE DATA LOADING
        ============================================================ */
-    async function ensureSmartPayLedger() {
-        let existing = ledgers.find(l => l.name === SMART_PAY_LEDGER_NAME);
-        if (existing) return existing;
-
-        const { data, error } = await sb.from('ledgers').insert({
-            user_id: currentUser.id,
-            name: SMART_PAY_LEDGER_NAME,
-            balance: 0
-        }).select().single();
-
-        if (error) { console.error('Failed to create Smart Pay Ledger:', error); return null; }
-        const newLedger = { id: data.id, name: data.name, balance: 0 };
-        ledgers.push(newLedger);
-        return newLedger;
-    }
-
     function extractDate(createdAt) {
         if (!createdAt) return '';
         const d = new Date(createdAt);
@@ -1943,8 +1939,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e1) throw e1;
             ledgers = (ledgersData || []).map(r => ({ id: r.id, name: r.name, balance: parseFloat(r.balance) || 0 }));
 
-            await ensureSmartPayLedger();
-
             const { data: histData, error: e2 } = await sb.from('ledger_history').select('*').order('created_at', { ascending: false });
             if (e2) throw e2;
             ledgerHistory = (histData || []).map(r => ({
@@ -1953,6 +1947,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 balanceAfter: parseFloat(r.balance_after) || 0,
                 isDebit: r.is_debit, sourceId: r.source_id
             }));
+
+            // The old automatic "Smart Pay Ledger" is gone: remove it if it is empty (no balance, no history).
+            // If it still holds money or history it is kept, and can be edited or deleted like any other ledger.
+            const oldSmartPay = ledgers.find(l => l.name === SMART_PAY_LEDGER_NAME);
+            if (oldSmartPay && Math.abs(oldSmartPay.balance) < 0.005 && !ledgerHistory.some(h => h.ledgerName === SMART_PAY_LEDGER_NAME)) {
+                const { error: spErr } = await sb.from('ledgers').delete().eq('id', oldSmartPay.id);
+                if (!spErr) ledgers = ledgers.filter(l => l.id !== oldSmartPay.id);
+            }
 
             // Load expenses
             const { data: expData, error: e3 } = await sb.from('expenses').select('*').order('created_at');
@@ -2204,7 +2206,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') { e.preventDefault(); submitSmartPayIncomeBtn.click(); }
     });
 
-    openLedgerModalBtn.addEventListener('click', () => { openModal(ledgerModal); ledgerNameInput.focus(); });
+    openLedgerModalBtn.addEventListener('click', () => { openModal(ledgerModal); });
+    const newLedgerModal = document.getElementById('newLedgerModal');
+    document.getElementById('openNewLedgerModal').addEventListener('click', () => { openModal(newLedgerModal); ledgerNameInput.focus(); });
+    document.getElementById('closeNewLedgerModal').addEventListener('click', () => closeModal(newLedgerModal));
+    document.getElementById('cancelNewLedger').addEventListener('click', () => closeModal(newLedgerModal));
+    newLedgerModal.addEventListener('click', e => { if (e.target === newLedgerModal) closeModal(newLedgerModal); });
+    ledgerNameInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ledgerOpeningBalanceInput.focus(); } });
+    ledgerOpeningBalanceInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submitLedgerBtn.click(); } });
     closeLedgerModalBtn.addEventListener('click', () => closeModal(ledgerModal));
     cancelLedgerBtn.addEventListener('click', () => closeModal(ledgerModal));
     ledgerModal.addEventListener('click', e => { if (e.target === ledgerModal) closeModal(ledgerModal); });
@@ -2867,7 +2876,7 @@ document.addEventListener('DOMContentLoaded', function() {
             bankExpenseDepositSelect.appendChild(o.cloneNode(true));
         });
 
-        const availableLedgers = ledgers.filter(l => l.name !== SMART_PAY_LEDGER_NAME);
+        const availableLedgers = ledgers;
         if (availableLedgers.length === 0) {
             const p = document.createElement('option');
             p.value=''; p.textContent='-- No Ledgers --'; p.disabled=true; p.selected=true;
@@ -2978,7 +2987,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (ledgers.length === 0) { renderLedgerEmptyState(); return; }
         ledgerListContainer.innerHTML = '';
         ledgers.forEach((l, i) => {
-            const isSmartPay = l.name === SMART_PAY_LEDGER_NAME;
+            const isSmartPay = false;
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td class="no-col">${i+1}</td>
@@ -3288,7 +3297,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateMultiLedgerTotalDisplay();
         updateHistoryCurrentBalance(historyLedgerFilter.value);
         ledgerNameInput.value = ''; ledgerOpeningBalanceInput.value = '';
-        ledgerNameInput.focus();
+        closeModal(newLedgerModal);
         showToast('Ledger created', 'success');
     });
 
@@ -3312,11 +3321,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const oldBalance = ledger.balance;
         const nameChanged = oldName !== newName;
         const balanceChanged = Math.abs(oldBalance - newBalance) > 0.001;
-
-        if (oldName === SMART_PAY_LEDGER_NAME && nameChanged) {
-            showToast('Smart Pay Ledger name cannot be changed.', 'error');
-            return;
-        }
 
         const { error } = await sb.from('ledgers').update({
             name: newName, balance: newBalance
@@ -3606,10 +3610,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (deleteBtn) {
             const ledgerName = deleteBtn.dataset.ledgerName;
             const ledgerId = deleteBtn.dataset.ledgerId;
-            if (ledgerName === SMART_PAY_LEDGER_NAME) {
-                showToast('Smart Pay Ledger cannot be deleted.', 'error');
-                return;
-            }
             if (!confirm(`Delete ledger "${ledgerName}"? This will remove all its history.`)) return;
 
             await sb.from('ledgers').delete().eq('id', ledgerId);
@@ -3848,8 +3848,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    /* ============ AUTO-CAPITALIZE FIRST LETTER ============ */
-    // Only the first letter of what you type in a text box is made a capital; the rest stays exactly as typed.
+    /* ============ AUTO-CAPITALIZE FIRST LETTER OF EACH WORD ============ */
+    // The first letter of every word typed in a text box becomes a capital; the other letters stay exactly as typed.
     // Email and password fields are left alone so login keeps working. Add data-keep-case to any box that should stay as typed.
     document.addEventListener('input', e => {
         const el = e.target;
@@ -3857,12 +3857,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const isText = el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'search'));
         if (!isText || el.readOnly || el.hasAttribute('data-keep-case')) return;
         const v = el.value;
-        const i = v.search(/\S/);                       // first non-space character
-        if (i < 0) return;
-        const first = v.charAt(i), up = first.toUpperCase();
-        if (first === up) return;
+        const out = v.replace(/(^|\s)(\S)/g, (m, sp, ch) => sp + ch.toUpperCase());
+        if (out === v) return;
         const start = el.selectionStart, end = el.selectionEnd;
-        el.value = v.slice(0, i) + up + v.slice(i + 1);
+        el.value = out;
         try { el.setSelectionRange(start, end); } catch (err) { /* not supported for this input type */ }
     });
 
