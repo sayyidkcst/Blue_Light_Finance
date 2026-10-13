@@ -1058,6 +1058,7 @@
         <div class="modal-body">
             <button class="modal-btn modal-btn-submit" id="openNewLedgerModal" style="align-self:flex-start;">+ New Ledger</button>
             <div style="font-size: 14px; font-weight: 600; color: var(--text-muted); margin-top: 10px;">Existing Ledgers</div>
+            <input type="text" id="ledgerSearch" placeholder="Search ledger name or balance..." autocomplete="off" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none;">
             <div class="ledger-table-container">
                 <table class="ledger-table">
                     <thead><tr><th class="no-col">No.</th><th>Ledger Name</th><th>Balance</th><th class="action-col">Action</th></tr></thead>
@@ -2058,10 +2059,10 @@ document.addEventListener('DOMContentLoaded', function() {
        RENDER HELPERS
        ============================================================ */
     function renderExpenseEmptyState() {
-        expenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="5">No expenses for this date.</td></tr>`;
+        expenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="5">No Cash expenses for this date.</td></tr>`;
     }
     function renderBankExpenseEmptyState() {
-        bankExpenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="4">No bank expenses for this date.</td></tr>`;
+        bankExpenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="4">No Bank expenses for this date.</td></tr>`;
     }
     function renderSmartPayIncomeEmptyState() {
         smartPayIncomeTableBody.innerHTML = `<tr class="empty-row"><td colspan="3">No income for this date.</td></tr>`;
@@ -2248,6 +2249,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     openLedgerModalBtn.addEventListener('click', () => { openModal(ledgerModal); });
+    document.getElementById('ledgerSearch').addEventListener('input', renderLedgerList);
     const newLedgerModal = document.getElementById('newLedgerModal');
     document.getElementById('openNewLedgerModal').addEventListener('click', () => { openModal(newLedgerModal); ledgerNameInput.focus(); });
     document.getElementById('closeNewLedgerModal').addEventListener('click', () => closeModal(newLedgerModal));
@@ -3041,8 +3043,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function renderLedgerList() {
         if (ledgers.length === 0) { renderLedgerEmptyState(); return; }
+        const ledgerTerm = (document.getElementById('ledgerSearch').value || '').trim().toLowerCase();
+        const shownLedgers = !ledgerTerm ? ledgers : ledgers.filter(l =>
+            String(l.name).toLowerCase().includes(ledgerTerm) ||
+            fmtCurrency(l.balance).toLowerCase().includes(ledgerTerm) ||
+            String(l.balance).toLowerCase().includes(ledgerTerm));
+        if (shownLedgers.length === 0) {
+            ledgerListContainer.innerHTML = `<tr class="empty-row"><td colspan="4">No ledgers match your search.</td></tr>`;
+            return;
+        }
         ledgerListContainer.innerHTML = '';
-        ledgers.forEach((l, i) => {
+        shownLedgers.forEach((l, i) => {
             const isSmartPay = false;
             const row = document.createElement('tr');
             row.innerHTML = `
