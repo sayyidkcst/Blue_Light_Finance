@@ -839,7 +839,7 @@
         </div>
         <div class="header-center">
             <div class="text-red">Total Expenses : <span id="headerTotalExpenses">0.00</span></div>
-            <div class="multi-ledger-line">Savings : <span class="value" id="headerMultiLedgerTotal">0.00</span></div>
+            <div class="multi-ledger-line" id="savingsLine" role="button" tabindex="0" title="Click to see the savings split" style="cursor:pointer;">Savings : <span class="value" id="headerMultiLedgerTotal">0.00</span></div>
             <div class="multi-ledger-line" id="headerNextExpiryLine" style="display:none; font-size:12px;"><span class="value" id="headerNextExpiry" style="font-size:13px;"></span></div>
         </div>
         <div class="header-right">
@@ -1236,6 +1236,10 @@
                     <option value="all">All Ledgers</option>
                 </select>
             </div>
+            <div style="display: flex; gap: 12px; align-items: center; margin-top: 10px;">
+                <label style="font-size: 14px; font-weight: 500; color: var(--text-muted); min-width: 100px;" for="historySearch">Search:</label>
+                <input type="text" id="historySearch" placeholder="Search date, particular, ledger or amount..." autocomplete="off" style="flex: 1; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none;">
+            </div>
             <div class="history-table-container">
                 <table class="history-table">
                     <thead>
@@ -1273,9 +1277,11 @@
             </div>
         </div>
         <div class="modal-body" style="max-height: 520px;">
-            <div style="display: flex; gap: 12px; align-items: center;">
-                <label style="font-size: 14px; font-weight: 500; color: var(--text-muted); min-width: 100px;" for="monthlyExpenceMonth">Select Month:</label>
-                <input type="month" id="monthlyExpenceMonth" style="flex: 1; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none;">
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <label style="font-size: 14px; font-weight: 500; color: var(--text-muted);" for="monthlyExpenceFrom">Start Date:</label>
+                <input type="date" id="monthlyExpenceFrom" style="flex: 1; min-width: 140px; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none;">
+                <label style="font-size: 14px; font-weight: 500; color: var(--text-muted);" for="monthlyExpenceTo">End Date:</label>
+                <input type="date" id="monthlyExpenceTo" style="flex: 1; min-width: 140px; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none;">
                 <select id="monthlyExpenceType" style="width: 160px; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none;">
                     <option value="all">Cash + Bank</option>
                     <option value="cash">Cash only</option>
@@ -1397,6 +1403,33 @@
         </div>
         <div class="modal-footer">
             <button class="modal-btn modal-btn-cancel" id="closeExpiryBtn">Close</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="savingsModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Savings Split</h3>
+            <button class="modal-close" id="closeSavingsModal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:#f1f5f9; border-radius:8px; margin-bottom:14px;">
+                <span style="font-size:14px; font-weight:600; color:var(--text-muted);">Total Savings</span>
+                <span id="savingsTotalValue" style="font-size:20px; font-weight:700; color:var(--primary-dark);">0.00</span>
+            </div>
+            <table style="width:100%; border-collapse:collapse; font-size:14px;">
+                <thead><tr style="text-align:left; color:var(--text-muted);"><th style="padding:8px 4px; width:50px;">Sl No</th><th style="padding:8px 4px;">Part</th><th style="padding:8px 4px; text-align:center; width:60px;">Share</th><th style="padding:8px 4px; text-align:right;">Amount</th></tr></thead>
+                <tbody>
+                    <tr style="border-top:1px solid var(--border-color);"><td style="padding:10px 4px; color:var(--text-muted);">1</td><td>Needs</td><td style="text-align:center;">50%</td><td id="savingsNeeds" style="text-align:right; font-weight:600;">0.00</td></tr>
+                    <tr style="border-top:1px solid var(--border-color);"><td style="padding:10px 4px; color:var(--text-muted);">2</td><td>Ambitions</td><td style="text-align:center;">30%</td><td id="savingsAmbitions" style="text-align:right; font-weight:600;">0.00</td></tr>
+                    <tr style="border-top:1px solid var(--border-color);"><td style="padding:10px 4px; color:var(--text-muted);">3</td><td>Savings</td><td style="text-align:center;">20%</td><td id="savingsKeep" style="text-align:right; font-weight:600;">0.00</td></tr>
+                    <tr style="border-top:2px solid var(--border-color);"><td style="padding:10px 4px;"></td><td style="font-weight:700;">Total</td><td style="text-align:center; font-weight:700;">100%</td><td id="savingsSumValue" style="text-align:right; font-weight:700;">0.00</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-cancel" id="closeSavingsBtn">Close</button>
         </div>
     </div>
 </div>
@@ -1727,6 +1760,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const closeLedgerHistoryModalBtn = document.getElementById('closeLedgerHistoryModal');
     const closeHistoryBtn = document.getElementById('closeHistoryBtn');
     const historyLedgerFilter = document.getElementById('historyLedgerFilter');
+    const historySearchInput = document.getElementById('historySearch');
+    // True when a history record matches the search text (date, particular, ledger name or amount).
+    function historyMatchesSearch(h, term) {
+        if (!term) return true;
+        const hay = [h.date, h.caption, h.ledgerName, h.amount, fmtCurrency(h.amount), h.balanceAfter, fmtCurrency(h.balanceAfter)]
+            .map(v => String(v == null ? '' : v).toLowerCase()).join(' ');
+        return hay.includes(term);
+    }
     const historyTableBody = document.getElementById('historyTableBody');
     const historyCurrentBalanceDisplayEl = document.getElementById('historyCurrentBalanceDisplay');
 
@@ -2432,10 +2473,12 @@ document.addEventListener('DOMContentLoaded', function() {
     ledgerHistoryModal.addEventListener('click', e => { if (e.target === ledgerHistoryModal) closeModal(ledgerHistoryModal); });
 
     historyLedgerFilter.addEventListener('change', renderHistoryTable);
+    historySearchInput.addEventListener('input', renderHistoryTable);
 
     /* ============ MONTHLY EXPENCE REPORT ============ */
     const monthlyExpenceModal = document.getElementById('monthlyExpenceModal');
-    const monthlyExpenceMonth = document.getElementById('monthlyExpenceMonth');
+    const monthlyExpenceFrom = document.getElementById('monthlyExpenceFrom');
+    const monthlyExpenceTo = document.getElementById('monthlyExpenceTo');
     const monthlyExpenceType = document.getElementById('monthlyExpenceType');
     const monthlyExpenceBody = document.getElementById('monthlyExpenceTableBody');
 
@@ -2446,15 +2489,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function getMonthlyExpenceData() {
-        const month = monthlyExpenceMonth.value; // YYYY-MM
+        const from = monthlyExpenceFrom.value, to = monthlyExpenceTo.value; // YYYY-MM-DD
         const type = monthlyExpenceType.value;
+        const inRange = e => e.date && (!from || e.date >= from) && (!to || e.date <= to);
         let rows = [];
         if (type !== 'bank') {
-            allExpenses.filter(e => e.date && e.date.startsWith(month))
+            allExpenses.filter(inRange)
                 .forEach(e => rows.push({ date: e.date, caption: e.caption, ledger: e.ledger_name, kind: 'Cash', amount: e.amount }));
         }
         if (type !== 'cash') {
-            allBankExpenses.filter(e => e.date && e.date.startsWith(month))
+            allBankExpenses.filter(inRange)
                 .forEach(e => rows.push({ date: e.date, caption: e.caption, ledger: e.ledger_name, kind: 'Bank', amount: e.amount }));
         }
         rows.sort((a, b) => a.date.localeCompare(b.date));
@@ -2464,13 +2508,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function renderMonthlyExpence() {
-        if (!monthlyExpenceMonth.value) return;
+        if (monthlyExpenceFrom.value && monthlyExpenceTo.value && monthlyExpenceFrom.value > monthlyExpenceTo.value) {
+            showToast('Start date must be before the end date.', 'error');
+        }
         const d = getMonthlyExpenceData();
         document.getElementById('monthlyCashTotal').textContent = fmtCurrency(d.cash);
         document.getElementById('monthlyBankTotal').textContent = fmtCurrency(d.bank);
         document.getElementById('monthlyGrandTotal').textContent = fmtCurrency(d.total);
         if (d.rows.length === 0) {
-            monthlyExpenceBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">No expenses found for this month</td></tr>';
+            monthlyExpenceBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">No expenses found for this period</td></tr>';
             return;
         }
         monthlyExpenceBody.innerHTML = d.rows.map((r, i) => `
@@ -2485,9 +2531,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     document.getElementById('openMonthlyExpenceModal').addEventListener('click', () => {
-        if (!monthlyExpenceMonth.value) {
+        if (!monthlyExpenceFrom.value || !monthlyExpenceTo.value) {
+            // default: first and last day of the current month
             const n = new Date();
-            monthlyExpenceMonth.value = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+            const pad = v => String(v).padStart(2, '0');
+            const last = new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate();
+            monthlyExpenceFrom.value = `${n.getFullYear()}-${pad(n.getMonth() + 1)}-01`;
+            monthlyExpenceTo.value = `${n.getFullYear()}-${pad(n.getMonth() + 1)}-${pad(last)}`;
         }
         openModal(monthlyExpenceModal);
         renderMonthlyExpence();
@@ -2495,14 +2545,17 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('closeMonthlyExpenceModal').addEventListener('click', () => closeModal(monthlyExpenceModal));
     document.getElementById('closeMonthlyExpenceBtn').addEventListener('click', () => closeModal(monthlyExpenceModal));
     monthlyExpenceModal.addEventListener('click', e => { if (e.target === monthlyExpenceModal) closeModal(monthlyExpenceModal); });
-    monthlyExpenceMonth.addEventListener('change', renderMonthlyExpence);
+    monthlyExpenceFrom.addEventListener('change', renderMonthlyExpence);
+    monthlyExpenceTo.addEventListener('change', renderMonthlyExpence);
     monthlyExpenceType.addEventListener('change', renderMonthlyExpence);
 
     document.getElementById('printMonthlyExpenceBtn').addEventListener('click', () => {
         const d = getMonthlyExpenceData();
         if (d.rows.length === 0) { showToast('No expenses to print.', 'error'); return; }
-        const [y, m] = monthlyExpenceMonth.value.split('-');
-        const monthLabel = new Date(+y, +m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        const fmtD = v => v ? new Date(v + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+        const monthLabel = (monthlyExpenceFrom.value && monthlyExpenceTo.value)
+            ? `${fmtD(monthlyExpenceFrom.value)} to ${fmtD(monthlyExpenceTo.value)}`
+            : (monthlyExpenceFrom.value ? `From ${fmtD(monthlyExpenceFrom.value)}` : (monthlyExpenceTo.value ? `Up to ${fmtD(monthlyExpenceTo.value)}` : 'All dates'));
         const rowsHtml = d.rows.map((r, i) => `
             <tr>
                 <td style="text-align:center;">${i + 1}</td>
@@ -2514,7 +2567,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </tr>`).join('');
         const w = window.open('', '_blank', 'width=900,height=700');
         if (!w) { showToast('Please allow pop-ups to print.', 'error'); return; }
-        w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Monthly Expence - ${monthLabel}</title>
+        w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Expence Report - ${monthLabel}</title>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
                 body { font-family: 'Inter', Arial, sans-serif; padding: 24px; color: #1e293b; }
@@ -2545,9 +2598,10 @@ document.addEventListener('DOMContentLoaded', function() {
     /* ============ PRINT LEDGER TRANSACTIONS ============ */
     document.getElementById('printLedgerBtn').addEventListener('click', () => {
         const filter = historyLedgerFilter.value;
-        const filtered = filter === 'all'
+        const printTerm = historySearchInput.value.trim().toLowerCase();
+        const filtered = (filter === 'all'
             ? ledgerHistory
-            : ledgerHistory.filter(h => h.ledgerName === filter);
+            : ledgerHistory.filter(h => h.ledgerName === filter)).filter(h => historyMatchesSearch(h, printTerm));
 
         if (filtered.length === 0) {
             showToast('No transactions to print.', 'error');
@@ -2939,6 +2993,8 @@ document.addEventListener('DOMContentLoaded', function() {
         populateParticularList();
         const filter = historyLedgerFilter.value;
         let filtered = filter === 'all' ? ledgerHistory : ledgerHistory.filter(h => h.ledgerName === filter);
+        const term = historySearchInput.value.trim().toLowerCase();
+        if (term) filtered = filtered.filter(h => historyMatchesSearch(h, term));
 
         updateHistoryCurrentBalance(filter);
 
@@ -3870,6 +3926,29 @@ document.addEventListener('DOMContentLoaded', function() {
         const el = e.target;
         if (el && el.tagName === 'INPUT' && el.type === 'number' && document.activeElement === el) el.blur();
     }, { capture: true, passive: true });
+
+    /* ============ SAVINGS SPLIT (50 / 30 / 20) ============ */
+    const savingsModal = document.getElementById('savingsModal');
+    function showSavingsSplit() {
+        const total = ledgers.filter(l => multiLedgerIds.includes(l.id))
+            .reduce((sum, l) => sum + (parseFloat(l.balance) || 0), 0);
+        // work in whole paise so the three parts always add up exactly to the total
+        const cents = Math.round(total * 100);
+        const needs = Math.round(cents * 0.5);
+        const ambitions = Math.round(cents * 0.3);
+        const keep = cents - needs - ambitions;
+        document.getElementById('savingsTotalValue').textContent = fmtCurrency(cents / 100);
+        document.getElementById('savingsNeeds').textContent = fmtCurrency(needs / 100);
+        document.getElementById('savingsAmbitions').textContent = fmtCurrency(ambitions / 100);
+        document.getElementById('savingsKeep').textContent = fmtCurrency(keep / 100);
+        document.getElementById('savingsSumValue').textContent = fmtCurrency((needs + ambitions + keep) / 100);
+        openModal(savingsModal);
+    }
+    document.getElementById('savingsLine').addEventListener('click', showSavingsSplit);
+    document.getElementById('savingsLine').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showSavingsSplit(); } });
+    document.getElementById('closeSavingsModal').addEventListener('click', () => closeModal(savingsModal));
+    document.getElementById('closeSavingsBtn').addEventListener('click', () => closeModal(savingsModal));
+    savingsModal.addEventListener('click', e => { if (e.target === savingsModal) closeModal(savingsModal); });
 
     /* ============ EXPIRY INFO ============ */
     const expiryModal = document.getElementById('expiryModal');
