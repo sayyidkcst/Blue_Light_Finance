@@ -1239,7 +1239,7 @@
             </div>
             <div style="display: flex; gap: 12px; align-items: center; margin-top: 10px;">
                 <label style="font-size: 14px; font-weight: 500; color: var(--text-muted); min-width: 100px;" for="historySearch">Search:</label>
-                <input type="text" id="historySearch" placeholder="Search date, particular, ledger or amount..." autocomplete="off" style="flex: 1; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none;">
+                <input type="text" id="historySearch" placeholder="Search date, particular or amount..." autocomplete="off" style="flex: 1; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none;">
             </div>
             <div class="history-table-container">
                 <table class="history-table">
@@ -1453,7 +1453,7 @@
             </div>
             <div style="height: 1px; background: var(--border-color); margin: 16px 0 12px;"></div>
             <p style="font-size:13px; line-height:1.6; color:var(--text-muted);">
-                The Blue Light Finance Pro is how it keeps everyday money work in one place: expenses, bank entries, ledgers, transfers and printable history all sit together, so the numbers stay clear and easy to trust.
+                What I like most about Blue Light Finance Pro is how it keeps everyday money work in one place: expenses, bank entries, ledgers, transfers and printable history all sit together, so the numbers stay clear and easy to trust.
             </p>
         </div>
         <div class="modal-footer">
@@ -1765,7 +1765,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // True when a history record matches the search text (date, particular, ledger name or amount).
     function historyMatchesSearch(h, term) {
         if (!term) return true;
-        const hay = [h.date, h.caption, h.ledgerName, h.amount, fmtCurrency(h.amount), h.balanceAfter, fmtCurrency(h.balanceAfter)]
+        const hay = [h.date, h.caption, h.amount, fmtCurrency(h.amount), h.balanceAfter, fmtCurrency(h.balanceAfter)]
             .map(v => String(v == null ? '' : v).toLowerCase()).join(' ');
         return hay.includes(term);
     }
@@ -2059,10 +2059,10 @@ document.addEventListener('DOMContentLoaded', function() {
        RENDER HELPERS
        ============================================================ */
     function renderExpenseEmptyState() {
-        expenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="5">No Cash expenses for this date.</td></tr>`;
+        expenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="5">No expenses for this date.</td></tr>`;
     }
     function renderBankExpenseEmptyState() {
-        bankExpenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="4">No Bank expenses for this date.</td></tr>`;
+        bankExpenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="4">No bank expenses for this date.</td></tr>`;
     }
     function renderSmartPayIncomeEmptyState() {
         smartPayIncomeTableBody.innerHTML = `<tr class="empty-row"><td colspan="3">No income for this date.</td></tr>`;
@@ -2638,7 +2638,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <tr>
                     <td style="text-align:center;">${i + 1}</td>
                     <td>${record.date}</td>
-                    <td>${record.caption} <span style="color:#64748b; font-size:11px;">(${record.ledgerName})</span></td>
+                    <td>${record.caption}</td>
                     <td style="text-align:right; color:#dc2626;">${debit ? fmtCurrency(debit) : ''}</td>
                     <td style="text-align:right; color:#059669;">${credit ? fmtCurrency(credit) : ''}</td>
                     <td style="text-align:right; font-weight:600;">${fmtCurrency(record.balanceAfter)}</td>
@@ -3012,7 +3012,7 @@ document.addEventListener('DOMContentLoaded', function() {
             row.dataset.historyId = record.id;
             row.innerHTML = `
                 <td>${record.date}</td>
-                <td>${record.caption} <span style="color: var(--text-muted); font-size: 12px;">(${record.ledgerName})</span></td>
+                <td>${record.caption}</td>
                 <td style="text-align: right;" class="debit">${debitDisplay}</td>
                 <td style="text-align: right;" class="credit">${creditDisplay}</td>
                 <td style="text-align: right;" class="balance-col">${fmtCurrency(record.balanceAfter)}</td>
