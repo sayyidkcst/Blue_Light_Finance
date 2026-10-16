@@ -1289,6 +1289,10 @@
                     <option value="bank">Bank only</option>
                 </select>
             </div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <label style="font-size: 14px; font-weight: 500; color: var(--text-muted);" for="monthlyExpenceSearch">Search:</label>
+                <input type="text" id="monthlyExpenceSearch" placeholder="Search date, particular, ledger or amount..." autocomplete="off" style="flex: 1; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none;">
+            </div>
             <div style="display: flex; gap: 12px;">
                 <div style="flex:1; background:#f8fafc; border:1px solid var(--border-color); border-radius:8px; padding:10px 14px;">
                     <div style="font-size:12px; color:var(--text-muted);">Cash Expence</div>
@@ -2059,7 +2063,7 @@ document.addEventListener('DOMContentLoaded', function() {
        RENDER HELPERS
        ============================================================ */
     function renderExpenseEmptyState() {
-        expenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="5">No Cash expenses for this date.</td></tr>`;
+        expenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="5">No expenses for this date.</td></tr>`;
     }
     function renderBankExpenseEmptyState() {
         bankExpenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="4">No bank expenses for this date.</td></tr>`;
@@ -2481,6 +2485,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const monthlyExpenceModal = document.getElementById('monthlyExpenceModal');
     const monthlyExpenceFrom = document.getElementById('monthlyExpenceFrom');
     const monthlyExpenceTo = document.getElementById('monthlyExpenceTo');
+    const monthlyExpenceSearch = document.getElementById('monthlyExpenceSearch');
     const monthlyExpenceType = document.getElementById('monthlyExpenceType');
     const monthlyExpenceBody = document.getElementById('monthlyExpenceTableBody');
 
@@ -2503,6 +2508,11 @@ document.addEventListener('DOMContentLoaded', function() {
             allBankExpenses.filter(inRange)
                 .forEach(e => rows.push({ date: e.date, caption: e.caption, ledger: e.ledger_name, kind: 'Bank', amount: e.amount }));
         }
+        const term = monthlyExpenceSearch.value.trim().toLowerCase();
+        if (term) {
+            rows = rows.filter(r => [r.date, r.caption, r.ledger, r.kind, r.amount, fmtCurrency(r.amount)]
+                .map(v => String(v == null ? '' : v).toLowerCase()).join(' ').includes(term));
+        }
         rows.sort((a, b) => a.date.localeCompare(b.date));
         const cash = rows.filter(r => r.kind === 'Cash').reduce((t, r) => t + r.amount, 0);
         const bank = rows.filter(r => r.kind === 'Bank').reduce((t, r) => t + r.amount, 0);
@@ -2518,7 +2528,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('monthlyBankTotal').textContent = fmtCurrency(d.bank);
         document.getElementById('monthlyGrandTotal').textContent = fmtCurrency(d.total);
         if (d.rows.length === 0) {
-            monthlyExpenceBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">No expenses found for this period</td></tr>';
+            monthlyExpenceBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">No expenses found</td></tr>';
             return;
         }
         monthlyExpenceBody.innerHTML = d.rows.map((r, i) => `
@@ -2550,6 +2560,7 @@ document.addEventListener('DOMContentLoaded', function() {
     monthlyExpenceFrom.addEventListener('change', renderMonthlyExpence);
     monthlyExpenceTo.addEventListener('change', renderMonthlyExpence);
     monthlyExpenceType.addEventListener('change', renderMonthlyExpence);
+    monthlyExpenceSearch.addEventListener('input', renderMonthlyExpence);
 
     document.getElementById('printMonthlyExpenceBtn').addEventListener('click', () => {
         const d = getMonthlyExpenceData();
