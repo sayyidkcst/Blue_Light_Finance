@@ -419,6 +419,11 @@
             z-index: 1000; opacity: 0; transition: opacity .2s ease;
         }
         .modal-overlay.active { display: flex; opacity: 1; }
+        .modal-overlay { overscroll-behavior: contain; }
+        .modal-body { overscroll-behavior: contain; }
+        /* Lock main page scroll while any popup is open */
+        html.modal-open, html.modal-open body { overflow: hidden; }
+        html.modal-open body { padding-right: calc(20px + var(--sb-w, 0px)); }
 
         /* Edit History modal sits above the Ledger History modal */
         #editHistoryModal { z-index: 2000; }
@@ -987,7 +992,7 @@
 <!-- Modals -->
 <div class="modal-overlay" id="expenseModal">
     <div class="modal-content">
-        <div class="modal-header"><h3>Cash Expense Entry</h3><button class="modal-close" id="closeExpenseModal">&times;</button></div>
+        <div class="modal-header"><h3>Add New Expense</h3><button class="modal-close" id="closeExpenseModal">&times;</button></div>
         <div class="modal-body">
             <div class="modal-form-group"><label for="expenseCaption">Caption</label><input type="text" id="expenseCaption" placeholder="e.g., Office Supplies"></div>
             <div class="modal-form-group"><label for="expenseLedger">Ledger</label><select id="expenseLedger"></select></div>
@@ -1017,7 +1022,7 @@
 
 <div class="modal-overlay" id="bankExpenseModal">
     <div class="modal-content">
-        <div class="modal-header"><h3>Bank Expense Entry</h3><button class="modal-close" id="closeBankExpenseModal">&times;</button></div>
+        <div class="modal-header"><h3>Bank Expense Entry (SmartPay)</h3><button class="modal-close" id="closeBankExpenseModal">&times;</button></div>
         <div class="modal-body">
             <div class="modal-form-group"><label for="bankExpenseCaption">Caption</label><input type="text" id="bankExpenseCaption" placeholder="e.g., Bank Charges"></div>
             <div class="modal-form-group"><label for="bankExpenseLedger">Ledger</label><select id="bankExpenseLedger"></select></div>
@@ -2213,6 +2218,27 @@ document.addEventListener('DOMContentLoaded', function() {
     function openModal(m) { m.classList.add('active'); }
     function closeModal(m) { m.classList.remove('active'); }
 
+    // Lock the main page scroll while any popup (.modal-overlay) is open.
+    // Watches the 'active' class so it works for every modal, however it is opened/closed.
+    (function setupModalScrollLock() {
+        const root = document.documentElement;
+        function sync() {
+            const anyOpen = document.querySelector('.modal-overlay.active') !== null;
+            if (anyOpen && !root.classList.contains('modal-open')) {
+                // keep layout from shifting when the scrollbar disappears
+                root.style.setProperty('--sb-w', (window.innerWidth - root.clientWidth) + 'px');
+                root.classList.add('modal-open');
+            } else if (!anyOpen && root.classList.contains('modal-open')) {
+                root.classList.remove('modal-open');
+                root.style.removeProperty('--sb-w');
+            }
+        }
+        const obs = new MutationObserver(sync);
+        document.querySelectorAll('.modal-overlay').forEach(m =>
+            obs.observe(m, { attributes: true, attributeFilter: ['class'] }));
+        sync();
+    })();
+
     openExpenseModalBtn.addEventListener('click', () => { openModal(expenseModal); expenseCaptionInput.focus(); });
     closeExpenseModalBtn.addEventListener('click', () => closeModal(expenseModal));
     cancelExpenseBtn.addEventListener('click', () => closeModal(expenseModal));
@@ -2965,6 +2991,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /* ============ LEDGER DROPDOWNS ============ */
     function updateLedgerDropdowns() {
+        const _sels = [expenseLedgerSelect, bankExpenseLedgerSelect, incomeLedgerSelect, expenseDepositSelect, bankExpenseDepositSelect];
+        const _prev = _sels.map(el => el.value);
+        try { _updateLedgerDropdownsInner(); }
+        finally {
+            _sels.forEach((el, i) => {
+                if (_prev[i] && Array.from(el.options).some(o => o.value === _prev[i])) el.value = _prev[i];
+            });
+        }
+    }
+    function _updateLedgerDropdownsInner() {
         expenseLedgerSelect.innerHTML = '';
         bankExpenseLedgerSelect.innerHTML = '';
         incomeLedgerSelect.innerHTML = '';
@@ -3255,9 +3291,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (selectEl.value === expenseLedgerName) { showToast('Deposit ledger must be different from the expense ledger.', 'error'); return false; }
         return true;
     }
-    async function applyDeposit(checkEl, selectEl, amount, caption, expenseLedgerName, sourceId) {
-        if (!checkEl.checked) return;
-        await creditToLedger(selectEl.value, amount, caption + ' ← ' + expenseLedgerName, 'Deposit', sourceId + '-dep');
+    // depositLedgerName must be captured before deductFromLedger runs: that call rebuilds the
+    // dropdowns, which resets the deposit <select> back to its first option.
+    async function applyDeposit(depositLedgerName, amount, caption, expenseLedgerName, sourceId) {
+        if (!depositLedgerName) return;
+        await creditToLedger(depositLedgerName, amount, caption + ' ← ' + expenseLedgerName, 'Deposit', sourceId + '-dep');
     }
 
     /* ============ SUBMIT HANDLERS ============ */
@@ -3275,6 +3313,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (amount > ledger.balance) { showToast(`Amount exceeds balance of ${fmtCurrency(ledger.balance)}.`, 'error'); return; }
         if (!validateDeposit(expenseDepositCheck, expenseDepositSelect, ledgerName)) return;
 
+        const depositTarget = expenseDepositCheck.checked ? expenseDepositSelect.value : null;
         const sourceId = 'exp-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
         const todayStr = getSelectedDateStr();
         const createdAtISO = getSelectedDateTimeISO();
@@ -3286,7 +3325,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
         await deductFromLedger(ledgerName, amount, caption, type, sourceId);
-        await applyDeposit(expenseDepositCheck, expenseDepositSelect, amount, caption, ledgerName, sourceId);
+        await applyDeposit(depositTarget, amount, caption, ledgerName, sourceId);
 
         allExpenses.push({
             caption, ledger_name: ledgerName, amount, expense_type: type,
@@ -3315,6 +3354,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (amount > ledger.balance) { showToast(`Amount exceeds balance of ${fmtCurrency(ledger.balance)}.`, 'error'); return; }
         if (!validateDeposit(bankExpenseDepositCheck, bankExpenseDepositSelect, ledgerName)) return;
 
+        const depositTarget = bankExpenseDepositCheck.checked ? bankExpenseDepositSelect.value : null;
         const sourceId = 'bnk-' + Date.now() + '-' + Math.random().toString(36).substr(2,5);
         const todayStr = getSelectedDateStr();
         const createdAtISO = getSelectedDateTimeISO();
@@ -3325,7 +3365,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (error) { showToast('DB error: ' + error.message, 'error'); return; }
 
         await deductFromLedger(ledgerName, amount, caption, 'Bank Expense', sourceId);
-        await applyDeposit(bankExpenseDepositCheck, bankExpenseDepositSelect, amount, caption, ledgerName, sourceId);
+        await applyDeposit(depositTarget, amount, caption, ledgerName, sourceId);
 
         allBankExpenses.push({
             caption, ledger_name: ledgerName, amount, source_id: sourceId, date: todayStr
