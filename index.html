@@ -488,6 +488,41 @@
         }
         .modal-btn-submit:hover { background-color: #1e293b; transform: translateY(-1px); }
 
+        /* Entry popups (Cash Expense, Bank Expense, Income): fields laid out horizontally */
+        #expenseModal .modal-content,
+        #bankExpenseModal .modal-content,
+        #smartPayIncomeModal .modal-content { width: min(960px, 96vw); }
+        #expenseModal .modal-body,
+        #bankExpenseModal .modal-body,
+        #smartPayIncomeModal .modal-body {
+            flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 15px;
+        }
+        #expenseModal .modal-form-group,
+        #bankExpenseModal .modal-form-group,
+        #smartPayIncomeModal .modal-form-group { flex: 1 1 150px; min-width: 0; }
+        #expenseModal .modal-body > .modal-form-group:first-child,
+        #bankExpenseModal .modal-body > .modal-form-group:first-child,
+        #smartPayIncomeModal .modal-body > .modal-form-group:first-child { flex: 2 1 220px; }
+        #expenseDepositGroup, #bankExpenseDepositGroup { flex: 1 1 240px; }
+        .entry-preview {
+            display: none; padding: 10px 14px; border-radius: 8px;
+            background: #f1f5f9; border: 1px solid var(--border-color);
+            font-size: 14px; color: var(--text-main);
+        }
+        .entry-preview.show { display: block; }
+        .entry-preview .row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+        .entry-preview .val { font-weight: 600; color: var(--primary-dark); }
+        .entry-preview .val.neg { color: var(--accent-red); }
+        .entry-preview .val.pos { color: var(--accent-green); }
+        @media (max-width: 700px) {
+            #expenseModal .modal-body,
+            #bankExpenseModal .modal-body,
+            #smartPayIncomeModal .modal-body { flex-direction: column; align-items: stretch; }
+            #expenseModal .modal-form-group,
+            #bankExpenseModal .modal-form-group,
+            #smartPayIncomeModal .modal-form-group { flex: 0 0 auto; }
+        }
+
         .ledger-table-container {
             margin-top: 10px; border: 1px solid var(--border-color);
             border-radius: 6px; overflow: hidden;
@@ -868,8 +903,7 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Caption</th><th>Ledger</th><th>Amount</th>
-                                <th>type</th>
+                                <th>Caption</th><th>Ledger</th><th>Amount</th><th>Ledger Balance</th>
                                 <th style="width: 40px; text-align: center;">Action</th>
                             </tr>
                         </thead>
@@ -890,7 +924,7 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Caption</th><th>Ledger</th><th>Amount</th>
+                                    <th>Caption</th><th>Ledger</th><th>Amount</th><th>Ledger Balance</th>
                                     <th style="width: 40px; text-align: center;">Action</th>
                                 </tr>
                             </thead>
@@ -996,8 +1030,9 @@
         <div class="modal-body">
             <div class="modal-form-group"><label for="expenseCaption">Caption</label><input type="text" id="expenseCaption" placeholder="e.g., Office Supplies"></div>
             <div class="modal-form-group"><label for="expenseLedger">Ledger</label><select id="expenseLedger"></select></div>
+            <div class="modal-form-group"><label for="expenseLedgerBalance">Ledger Balance</label><input type="text" id="expenseLedgerBalance" readonly tabindex="-1" placeholder="0.00" style="background:#f1f5f9; font-weight:600;"></div>
             <div class="modal-form-group"><label for="expenseAmount">Amount</label><input type="number" id="expenseAmount" placeholder="0.00"></div>
-            <div class="modal-form-group"><label for="expenseType">Type</label>
+            <div class="modal-form-group" style="display:none;"><label for="expenseType">Type</label>
                 <select id="expenseType">
                     <option value="General">General</option>
                     <option value="Utilities">Utilities</option>
@@ -1012,6 +1047,7 @@
                 <label for="expenseDepositLedger">Deposit Ledger (amount will be added)</label>
                 <select id="expenseDepositLedger"></select>
             </div>
+            <div class="entry-preview" id="expensePreview" style="flex: 1 1 100%;"></div>
         </div>
         <div class="modal-footer">
             <button class="modal-btn modal-btn-cancel" id="cancelExpense">Cancel</button>
@@ -1026,6 +1062,7 @@
         <div class="modal-body">
             <div class="modal-form-group"><label for="bankExpenseCaption">Caption</label><input type="text" id="bankExpenseCaption" placeholder="e.g., Bank Charges"></div>
             <div class="modal-form-group"><label for="bankExpenseLedger">Ledger</label><select id="bankExpenseLedger"></select></div>
+            <div class="modal-form-group"><label for="bankExpenseLedgerBalance">Ledger Balance</label><input type="text" id="bankExpenseLedgerBalance" readonly tabindex="-1" placeholder="0.00" style="background:#f1f5f9; font-weight:600;"></div>
             <div class="modal-form-group"><label for="bankExpenseAmount">Amount</label><input type="number" id="bankExpenseAmount" placeholder="0.00"></div>
             <div class="modal-form-group">
                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:500;"><input type="checkbox" id="bankExpenseDepositCheck" style="width:auto; margin:0;"> Deposit to another ledger</label>
@@ -1034,6 +1071,7 @@
                 <label for="bankExpenseDepositLedger">Deposit Ledger (amount will be added)</label>
                 <select id="bankExpenseDepositLedger"></select>
             </div>
+            <div class="entry-preview" id="bankExpensePreview" style="flex: 1 1 100%;"></div>
         </div>
         <div class="modal-footer">
             <button class="modal-btn modal-btn-cancel" id="cancelBankExpense">Cancel</button>
@@ -1049,6 +1087,7 @@
             <div class="modal-form-group"><label for="smartPayInvoice">Invoice / Particular</label><input type="text" id="smartPayInvoice" placeholder="e.g., INV-001"></div>
             <div class="modal-form-group"><label for="incomeLedger">Ledger (Credit To)</label><select id="incomeLedger"></select></div>
             <div class="modal-form-group"><label for="smartPayIncomeAmount">Amount</label><input type="number" id="smartPayIncomeAmount" placeholder="0.00"></div>
+            <div class="entry-preview" id="incomePreview" style="flex: 1 1 100%;"></div>
         </div>
         <div class="modal-footer">
             <button class="modal-btn modal-btn-cancel" id="cancelSmartPayIncome">Cancel</button>
@@ -2072,7 +2111,7 @@ document.addEventListener('DOMContentLoaded', function() {
         expenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="5">No expenses for this date.</td></tr>`;
     }
     function renderBankExpenseEmptyState() {
-        bankExpenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="4">No bank expenses for this date.</td></tr>`;
+        bankExpenseTableBody.innerHTML = `<tr class="empty-row"><td colspan="5">No bank expenses for this date.</td></tr>`;
     }
     function renderSmartPayIncomeEmptyState() {
         smartPayIncomeTableBody.innerHTML = `<tr class="empty-row"><td colspan="3">No income for this date.</td></tr>`;
@@ -2081,12 +2120,30 @@ document.addEventListener('DOMContentLoaded', function() {
         ledgerListContainer.innerHTML = `<tr class="empty-row"><td colspan="4">No ledgers added yet.</td></tr>`;
     }
 
+    // Fill the "Ledger Balance" column in the cash and bank expense tables with the ledger's
+    // balance right AFTER that expense was posted (taken from the ledger history entry of the expense).
+    function refreshExpenseLedgerBalances() {
+        recomputeHistoryBalances();
+        [expenseTableBody, bankExpenseTableBody].forEach(body => {
+            if (!body) return;
+            body.querySelectorAll('tr[data-ledger-name]').forEach(tr => {
+                const cell = tr.querySelector('.ledger-bal');
+                if (!cell) return;
+                const sid = tr.dataset.sourceId;
+                const rec = sid ? ledgerHistory.find(h => h.sourceId === sid && h.ledgerName === tr.dataset.ledgerName && h.isDebit) : null;
+                cell.textContent = rec ? fmtCurrency(rec.balanceAfter) : '—';
+                cell.style.fontWeight = '600';
+                cell.style.color = rec && rec.balanceAfter < 0 ? 'var(--accent-red)' : 'var(--primary-dark)';
+            });
+        });
+    }
+
     function addExpenseRow(caption, ledgerName, amount, type, sourceId, dateStr) {
         const emptyRow = expenseTableBody.querySelector('.empty-row');
         if (emptyRow) emptyRow.remove();
         const newRow = document.createElement('tr');
         newRow.innerHTML = `
-            <td>${caption}</td><td>${ledgerName}</td><td>${fmtCurrency(amount)}</td><td>${type}</td>
+            <td>${caption}</td><td>${ledgerName}</td><td>${fmtCurrency(amount)}</td><td class="ledger-bal"></td>
             <td style="text-align: center;">
                 <button class="btn-delete-row" title="Delete Expense">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
@@ -2099,6 +2156,7 @@ document.addEventListener('DOMContentLoaded', function() {
         newRow.dataset.sourceId = sourceId || '';
         newRow.dataset.date = dateStr || '';
         expenseTableBody.appendChild(newRow);
+        refreshExpenseLedgerBalances();
     }
 
     function addBankExpenseRow(caption, ledgerName, amount, sourceId, dateStr) {
@@ -2106,7 +2164,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (emptyRow) emptyRow.remove();
         const newRow = document.createElement('tr');
         newRow.innerHTML = `
-            <td>${caption}</td><td>${ledgerName}</td><td>${fmtCurrency(amount)}</td>
+            <td>${caption}</td><td>${ledgerName}</td><td>${fmtCurrency(amount)}</td><td class="ledger-bal"></td>
             <td style="text-align: center;">
                 <button class="btn-delete-row" title="Delete Expense">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
@@ -2118,6 +2176,7 @@ document.addEventListener('DOMContentLoaded', function() {
         newRow.dataset.sourceId = sourceId || '';
         newRow.dataset.date = dateStr || '';
         bankExpenseTableBody.appendChild(newRow);
+        refreshExpenseLedgerBalances();
     }
 
     function addIncomeRow(invoice, amount, sourceId, dateStr) {
@@ -2670,6 +2729,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /* ============ PRINT LEDGER TRANSACTIONS ============ */
     document.getElementById('printLedgerBtn').addEventListener('click', () => {
+        recomputeHistoryBalances();
         const filter = historyLedgerFilter.value;
         const printTerm = historySearchInput.value.trim().toLowerCase();
         const filtered = (filter === 'all'
@@ -3072,7 +3132,31 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    /* Recalculate every history row's running balance from the entries themselves.
+       The saved balance_after is only a snapshot from when the row was created, so it goes
+       stale when an earlier entry is edited, deleted or reversed. ledgerHistory is newest-first,
+       so we walk it oldest -> newest per ledger and anchor the final row to the ledger's current balance. */
+    function recomputeHistoryBalances() {
+        const byLedger = {};
+        for (let i = ledgerHistory.length - 1; i >= 0; i--) {
+            const h = ledgerHistory[i];
+            (byLedger[h.ledgerName] = byLedger[h.ledgerName] || []).push(h);
+        }
+        Object.keys(byLedger).forEach(name => {
+            const rows = byLedger[name];
+            let run = 0;
+            const raw = rows.map(h => {
+                run += h.isDebit ? -(Number(h.amount) || 0) : (Number(h.amount) || 0);
+                return run;
+            });
+            const lg = ledgers.find(l => l.name === name);
+            const offset = lg ? (Number(lg.balance) || 0) - run : 0;
+            rows.forEach((h, i) => { h.balanceAfter = Math.round((raw[i] + offset) * 100) / 100; });
+        });
+    }
+
     function renderHistoryTable() {
+        recomputeHistoryBalances();
         populateParticularList();
         const filter = historyLedgerFilter.value;
         let filtered = filter === 'all' ? ledgerHistory : ledgerHistory.filter(h => h.ledgerName === filter);
@@ -3123,6 +3207,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function renderLedgerList() {
+        refreshExpenseLedgerBalances();
+        refreshEntryPreviews();
         if (ledgers.length === 0) { renderLedgerEmptyState(); return; }
         const ledgerTerm = (document.getElementById('ledgerSearch').value || '').trim().toLowerCase();
         const shownLedgers = !ledgerTerm ? ledgers : ledgers.filter(l =>
@@ -3297,6 +3383,66 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!depositLedgerName) return;
         await creditToLedger(depositLedgerName, amount, caption + ' ← ' + expenseLedgerName, 'Deposit', sourceId + '-dep');
     }
+
+    /* ============ LIVE BALANCE PREVIEW IN ENTRY POPUPS ============ */
+    function renderEntryPreview(boxId, rows) {
+        const box = document.getElementById(boxId);
+        if (!box) return;
+        box.innerHTML = rows.map(r => {
+            const cls = r.after < 0 ? 'neg' : '';
+            const arrow = r.amount > 0 ? ` &rarr; <span class="val ${cls}">${fmtCurrency(r.after)}</span>` : '';
+            return `<div class="row"><span>${r.label}</span><span>Balance: <span class="val">${fmtCurrency(r.before)}</span>${arrow}</span></div>`;
+        }).join('');
+        box.classList.toggle('show', rows.length > 0);
+    }
+    function refreshEntryPreviews() {
+        try {
+            // Cash expense
+            let rows = [];
+            let lg = ledgers.find(l => l.name === expenseLedgerSelect.value);
+            let amt = parseFloat(expenseAmountInput.value) || 0;
+            if (lg) {
+                rows.push({ label: lg.name, before: lg.balance, after: lg.balance - amt, amount: amt });
+                const dep = expenseDepositCheck.checked ? ledgers.find(l => l.name === expenseDepositSelect.value) : null;
+                if (dep && dep.name !== lg.name) rows.push({ label: dep.name + ' (deposit)', before: dep.balance, after: dep.balance + amt, amount: amt });
+            }
+            renderEntryPreview('expensePreview', rows);
+            const eb = document.getElementById('expenseLedgerBalance');
+            if (eb) eb.value = ledgers.find(l => l.name === expenseLedgerSelect.value) ? fmtCurrency(ledgers.find(l => l.name === expenseLedgerSelect.value).balance) : '';
+
+            // Bank expense
+            rows = [];
+            lg = ledgers.find(l => l.name === bankExpenseLedgerSelect.value);
+            amt = parseFloat(bankExpenseAmountInput.value) || 0;
+            if (lg) {
+                rows.push({ label: lg.name, before: lg.balance, after: lg.balance - amt, amount: amt });
+                const dep = bankExpenseDepositCheck.checked ? ledgers.find(l => l.name === bankExpenseDepositSelect.value) : null;
+                if (dep && dep.name !== lg.name) rows.push({ label: dep.name + ' (deposit)', before: dep.balance, after: dep.balance + amt, amount: amt });
+            }
+            renderEntryPreview('bankExpensePreview', rows);
+            const bb = document.getElementById('bankExpenseLedgerBalance');
+            if (bb) bb.value = ledgers.find(l => l.name === bankExpenseLedgerSelect.value) ? fmtCurrency(ledgers.find(l => l.name === bankExpenseLedgerSelect.value).balance) : '';
+
+            // Income
+            rows = [];
+            lg = ledgers.find(l => l.name === incomeLedgerSelect.value);
+            amt = parseFloat(smartPayIncomeAmountInput.value) || 0;
+            if (lg) rows.push({ label: lg.name, before: lg.balance, after: lg.balance + amt, amount: amt });
+            renderEntryPreview('incomePreview', rows);
+        } catch (e) { /* elements not ready yet */ }
+    }
+    [expenseLedgerSelect, expenseAmountInput, expenseDepositCheck, expenseDepositSelect,
+     bankExpenseLedgerSelect, bankExpenseAmountInput, bankExpenseDepositCheck, bankExpenseDepositSelect,
+     incomeLedgerSelect, smartPayIncomeAmountInput].forEach(el => {
+        if (!el) return;
+        el.addEventListener('input', refreshEntryPreviews);
+        el.addEventListener('change', refreshEntryPreviews);
+    });
+    // Refresh when a popup opens (ledger lists may have been rebuilt)
+    ['expenseModal', 'bankExpenseModal', 'smartPayIncomeModal'].forEach(id => {
+        const m = document.getElementById(id);
+        if (m) new MutationObserver(refreshEntryPreviews).observe(m, { attributes: true, attributeFilter: ['class'] });
+    });
 
     /* ============ SUBMIT HANDLERS ============ */
     submitExpenseBtn.addEventListener('click', async () => {
