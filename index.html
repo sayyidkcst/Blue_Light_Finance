@@ -923,7 +923,7 @@
                 <button type="submit" class="auth-submit" id="signupBtn">Create Account</button>
                 <div class="auth-msg" id="signupMsg"></div>
             </form>
-            <div class="auth-foot"><b>KCST Media Technology -  96 333 151 77</div></b>
+            <div class="auth-foot">Blue Light Finance Pro</div>
         </div>
     </div>
 </div>
@@ -965,7 +965,15 @@
                 </div>
             </div>
         </div>
-        <div class="menu-item">DataBase</div>
+        <div class="menu-item">
+            Tools
+            <div class="sub-menu">
+                <div class="sub-menu-item" id="openNotepadModal">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="14" y2="17"></line></svg>
+                    Notepad
+                </div>
+            </div>
+        </div>
         <div class="menu-item">
             Report
             <div class="sub-menu">
@@ -1501,6 +1509,63 @@
         </div>
         <div class="modal-footer">
             <button class="modal-btn modal-btn-cancel" id="closeMonthlyExpenceBtn">Close</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="notepadModal">
+    <style>
+        #notepadModal .modal-content { width: 880px; max-width: 96vw; }
+        .np-wrap { display: flex; gap: 14px; height: 440px; }
+        .np-side { width: 250px; flex: none; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+        .np-side input[type=text], .np-title {
+            width: 100%; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 8px;
+            font-family: 'Inter', sans-serif; font-size: 13px; outline: none; background: #fff;
+        }
+        .np-side input[type=text]:focus, .np-title:focus, #notepadText:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+        .np-new { padding: 9px; border: none; border-radius: 8px; background: var(--primary-dark); color: #fff; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .np-new:hover { background: #1e293b; }
+        .np-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
+        .np-item { position: relative; padding: 9px 30px 9px 11px; border: 1px solid var(--border-color); border-radius: 8px; background: #f8fafc; cursor: pointer; }
+        .np-item:hover { background: #eef2f7; }
+        .np-item.active { background: #fffbe6; border-color: var(--accent-yellow); box-shadow: inset 3px 0 0 var(--accent-yellow); }
+        .np-item .t { font-size: 13px; font-weight: 600; color: var(--primary-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .np-item .d { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .np-item .x { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border: none; border-radius: 6px; background: transparent; color: #94a3b8; font-size: 16px; line-height: 1; cursor: pointer; }
+        .np-item .x:hover { background: #fee2e2; color: var(--accent-red); }
+        .np-empty { text-align: center; color: var(--text-muted); font-size: 12px; padding: 14px 0; }
+        .np-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+        .np-title { font-size: 15px; font-weight: 600; }
+        #notepadText { flex: 1; width: 100%; resize: none; padding: 14px 16px; border: 1px solid var(--border-color); border-radius: 10px; font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.7; color: var(--text-main); background: #fffef7; outline: none; }
+        @media (max-width: 700px) { .np-wrap { flex-direction: column; height: 560px; } .np-side { width: 100%; height: 190px; } }
+    </style>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Notepad</h3>
+            <button class="modal-close" id="closeNotepadModal">&times;</button>
+        </div>
+        <div class="modal-body" style="max-height: 560px;">
+            <div class="np-wrap">
+                <div class="np-side">
+                    <button class="np-new" id="notepadNewBtn">+ New Note</button>
+                    <input type="text" id="notepadSearch" placeholder="Search notes...">
+                    <div class="np-list" id="notepadList"></div>
+                </div>
+                <div class="np-main">
+                    <input type="text" class="np-title" id="notepadTitle" placeholder="Note title" maxlength="120">
+                    <textarea id="notepadText" spellcheck="true" placeholder="Type your note here... it is saved automatically."></textarea>
+                    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);">
+                        <span id="notepadCount">0 words, 0 characters</span>
+                        <span id="notepadStatus"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-cancel" id="notepadDeleteBtn" style="margin-right:auto; color:var(--accent-red);">Delete Note</button>
+            <button class="modal-btn modal-btn-cancel" id="notepadDownloadBtn">Download</button>
+            <button class="modal-btn" id="notepadPrintBtn" style="background-color: var(--accent-green); color: #fff; border: none;">Print</button>
+            <button class="modal-btn modal-btn-cancel" id="closeNotepadBtn">Close</button>
         </div>
     </div>
 </div>
@@ -2923,6 +2988,233 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div>Bank Expence: ${fmtCurrency(d.bank)}</div>
                 <div class="grand">Total Expence: ${fmtCurrency(d.total)}</div>
             </div>
+            <script>window.onload = function(){ window.print(); };<\/script>
+            </body></html>`);
+        w.document.close();
+    });
+
+    /* ============ NOTEPAD (Tools menu) - multiple notes, saved in Supabase "notes" table ============ */
+    const notepadModal = document.getElementById('notepadModal');
+    const npTitle = document.getElementById('notepadTitle');
+    const npText = document.getElementById('notepadText');
+    const npCount = document.getElementById('notepadCount');
+    const npStatus = document.getElementById('notepadStatus');
+    const npList = document.getElementById('notepadList');
+    const npSearch = document.getElementById('notepadSearch');
+    let npNotes = [], npActive = null, npTimer = null;
+    let npMode = 'cloud'; // 'cloud' = Supabase table, 'local' = this browser only (used if the table is missing)
+
+    function npUid() { return currentUser ? currentUser.id : 'guest'; }
+    function npKey() { return 'blf_notes_' + npUid(); }
+    function npNewId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+    function npMap(r) {
+        return { id: r.id, title: r.title || '', text: r.body || '', updated: new Date(r.updated_at || r.created_at || Date.now()).getTime() };
+    }
+    function npCurrent() { return npNotes.find(n => n.id === npActive); }
+    function npName(n) {
+        const t = (n.title || '').trim();
+        if (t) return t;
+        const line = (n.text || '').trim().split('\n')[0];
+        return line ? line.slice(0, 40) : 'Untitled note';
+    }
+
+    // ---- browser storage (fallback + one-time import of older notes) ----
+    function npReadLocal() {
+        let list = [];
+        try {
+            const raw = localStorage.getItem(npKey());
+            if (raw) list = JSON.parse(raw) || [];
+            const old = localStorage.getItem('blf_notepad_' + npUid()); // very first single-note version
+            if (old && old.trim()) list.push({ id: npNewId(), title: 'My note', text: old, updated: Date.now() });
+        } catch (e) { list = []; }
+        return list;
+    }
+    function npWriteLocal() {
+        try { localStorage.setItem(npKey(), JSON.stringify(npNotes)); return true; } catch (e) { return false; }
+    }
+    function npClearLocal() {
+        try { localStorage.removeItem(npKey()); localStorage.removeItem('blf_notepad_' + npUid()); } catch (e) {}
+    }
+
+    // ---- load ----
+    async function npLoad() {
+        npNotes = [];
+        npMode = 'cloud';
+        if (currentUser) {
+            try {
+                const { data, error } = await sb.from('notes').select('*').eq('user_id', currentUser.id).order('updated_at', { ascending: false });
+                if (error) throw error;
+                npNotes = (data || []).map(npMap);
+                // move notes saved earlier in this browser into the database (once)
+                const local = npReadLocal().filter(n => (n.title || '').trim() || (n.text || '').trim());
+                if (local.length) {
+                    const rows = local.map(n => ({ user_id: currentUser.id, title: n.title || '', body: n.text || '', updated_at: new Date(n.updated || Date.now()).toISOString() }));
+                    const { data: ins, error: e2 } = await sb.from('notes').insert(rows).select();
+                    if (!e2) { npNotes = npNotes.concat((ins || []).map(npMap)); npClearLocal(); }
+                }
+                npNotes.sort((a, b) => b.updated - a.updated);
+                npStatus.textContent = '';
+                return;
+            } catch (e) {
+                console.warn('Notes table not available, using this browser only:', e);
+            }
+        }
+        npMode = 'local';
+        npNotes = npReadLocal();
+        npNotes.sort((a, b) => b.updated - a.updated);
+        npStatus.textContent = 'Cloud sync is not set up - saving on this device only';
+    }
+
+    // ---- save ----
+    async function npSaveNote(n) {
+        if (npMode === 'local') {
+            npStatus.textContent = npWriteLocal() ? 'Saved on this device only' : 'Could not save';
+            return;
+        }
+        const { error } = await sb.from('notes').update({ title: n.title, body: n.text, updated_at: new Date(n.updated).toISOString() }).eq('id', n.id);
+        if (error) { console.error(error); npStatus.textContent = 'Save failed - check your connection'; }
+        else npStatus.textContent = 'Saved';
+    }
+    function npFlush() {
+        clearTimeout(npTimer);
+        const n = npCurrent();
+        if (!n) return Promise.resolve();
+        if (n.title === npTitle.value && n.text === npText.value) return Promise.resolve();
+        n.title = npTitle.value; n.text = npText.value; n.updated = Date.now();
+        npNotes.sort((a, b) => b.updated - a.updated);
+        return npSaveNote(n);
+    }
+
+    // ---- UI ----
+    function npCountUpdate() {
+        const t = npText.value.trim();
+        const words = t ? t.split(/\s+/).length : 0;
+        npCount.textContent = `${words} word${words === 1 ? '' : 's'}, ${npText.value.length} characters`;
+    }
+    function npRender() {
+        const q = npSearch.value.trim().toLowerCase();
+        const items = npNotes.filter(n => !q || (n.title + ' ' + n.text).toLowerCase().includes(q));
+        if (!items.length) { npList.innerHTML = '<div class="np-empty">No notes found</div>'; return; }
+        npList.innerHTML = items.map(n => {
+            const d = new Date(n.updated);
+            const when = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ', ' +
+                d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            return `<div class="np-item ${n.id === npActive ? 'active' : ''}" data-id="${escHtml(n.id)}">
+                <div class="t">${escHtml(npName(n))}</div><div class="d">${when}</div>
+                <button class="x" data-del="${escHtml(n.id)}" title="Delete note">&times;</button></div>`;
+        }).join('');
+    }
+    function npSelect(id) {
+        npFlush();
+        npActive = id;
+        const n = npCurrent();
+        npTitle.value = n ? n.title : '';
+        npText.value = n ? n.text : '';
+        npCountUpdate(); npRender();
+    }
+    async function npCreate() {
+        npFlush();
+        let n;
+        if (npMode === 'cloud') {
+            const { data, error } = await sb.from('notes').insert({ user_id: currentUser.id, title: '', body: '' }).select().single();
+            if (error) { console.error(error); showToast('Could not create note', 'error'); return; }
+            n = npMap(data);
+        } else {
+            n = { id: npNewId(), title: '', text: '', updated: Date.now() };
+        }
+        npNotes.unshift(n);
+        npSearch.value = '';
+        npActive = null; npSelect(n.id);
+        npTitle.focus();
+    }
+    async function npDelete(id) {
+        const n = npNotes.find(x => x.id === id);
+        if (!n || !confirm(`Delete "${npName(n)}"? This cannot be undone.`)) return;
+        if (npMode === 'cloud') {
+            const { error } = await sb.from('notes').delete().eq('id', id);
+            if (error) { console.error(error); showToast('Could not delete note', 'error'); return; }
+        }
+        npNotes = npNotes.filter(x => x.id !== id);
+        if (npMode === 'local') npWriteLocal();
+        if (!npNotes.length) { npActive = null; npCreate(); return; }
+        if (id === npActive) { npActive = null; npSelect(npNotes[0].id); }
+        else npRender();
+    }
+
+    document.getElementById('openNotepadModal').addEventListener('click', async () => {
+        npActive = null; npSearch.value = '';
+        npTitle.value = ''; npText.value = ''; npCountUpdate();
+        npList.innerHTML = '<div class="np-empty">Loading...</div>';
+        npStatus.textContent = 'Loading...';
+        openModal(notepadModal);
+        await npLoad();
+        if (!notepadModal.classList.contains('active')) return;
+        if (!npNotes.length) await npCreate();
+        else { npSelect(npNotes[0].id); npText.focus(); }
+    });
+    async function npClose() {
+        await npFlush();
+        // drop blank untitled notes so the list stays tidy
+        const blank = npNotes.filter(n => !n.title.trim() && !n.text.trim());
+        if (blank.length) {
+            if (npMode === 'cloud') await sb.from('notes').delete().in('id', blank.map(n => n.id));
+            npNotes = npNotes.filter(n => !blank.includes(n));
+            if (npMode === 'local') npWriteLocal();
+        }
+        closeModal(notepadModal);
+    }
+    document.getElementById('closeNotepadModal').addEventListener('click', npClose);
+    document.getElementById('closeNotepadBtn').addEventListener('click', npClose);
+    notepadModal.addEventListener('click', e => { if (e.target === notepadModal) npClose(); });
+
+    document.getElementById('notepadNewBtn').addEventListener('click', npCreate);
+    document.getElementById('notepadDeleteBtn').addEventListener('click', () => npDelete(npActive));
+    npSearch.addEventListener('input', npRender);
+    npList.addEventListener('click', e => {
+        const del = e.target.closest('[data-del]');
+        if (del) { e.stopPropagation(); npDelete(del.dataset.del); return; }
+        const item = e.target.closest('.np-item');
+        if (item && item.dataset.id !== npActive) npSelect(item.dataset.id);
+    });
+    function npOnEdit() {
+        npCountUpdate();
+        npStatus.textContent = 'Saving...';
+        clearTimeout(npTimer);
+        npTimer = setTimeout(() => { npFlush(); npRender(); }, 600);
+    }
+    npTitle.addEventListener('input', npOnEdit);
+    npText.addEventListener('input', npOnEdit);
+
+    document.getElementById('notepadDownloadBtn').addEventListener('click', () => {
+        npFlush();
+        const n = npCurrent();
+        if (!n || !n.text.trim()) { showToast('Nothing to download.', 'error'); return; }
+        const blob = new Blob([(n.title ? n.title + '\n\n' : '') + n.text], { type: 'text/plain;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (npName(n).replace(/[\\/:*?"<>|]+/g, '').trim() || 'note') + '.txt';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+
+    document.getElementById('notepadPrintBtn').addEventListener('click', () => {
+        npFlush();
+        const n = npCurrent();
+        if (!n || !(n.text.trim() || n.title.trim())) { showToast('Nothing to print.', 'error'); return; }
+        const w = window.open('', '_blank', 'width=800,height=700');
+        if (!w) { showToast('Please allow pop-ups to print.', 'error'); return; }
+        w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escHtml(npName(n))}</title>
+            <style>
+                @page { size: A4; margin: 16mm; }
+                body { font-family: 'Inter', Arial, sans-serif; padding: 24px; color: #1e293b; }
+                h1 { font-size: 20px; border-bottom: 3px solid #0f172a; padding-bottom: 8px; margin-bottom: 6px; }
+                .when { font-size: 12px; color: #64748b; margin-bottom: 16px; }
+                pre { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; font-size: 14px; line-height: 1.7; }
+                @media print { body { padding: 0; } }
+            </style></head><body>
+            <h1>${escHtml(npName(n))}</h1>
+            <div class="when">${new Date(n.updated).toLocaleString('en-GB')}</div>
+            <pre>${escHtml(n.text)}</pre>
             <script>window.onload = function(){ window.print(); };<\/script>
             </body></html>`);
         w.document.close();
