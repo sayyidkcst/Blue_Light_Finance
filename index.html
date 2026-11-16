@@ -632,6 +632,62 @@
             #smartPayIncomeModal .modal-form-group { flex: 0 0 auto; }
         }
 
+
+        /* Ledger Transfer + New Ledger Transaction popups: fields laid out horizontally */
+        #ledgerTransferModal .modal-content,
+        #newTransactionModal .modal-content { width: min(960px, 96vw); }
+        #ledgerTransferModal .modal-body,
+        #newTransactionModal .modal-body {
+            flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 15px; max-height: 70vh;
+        }
+        #ledgerTransferModal .modal-form-group,
+        #newTransactionModal .modal-form-group { flex: 1 1 150px; min-width: 0; }
+        #newTransactionModal .modal-body > .modal-form-group:nth-child(3) { flex: 2 1 220px; }
+        #ledgerTransferModal .modal-body > .modal-form-group:nth-child(1),
+        #ledgerTransferModal .modal-body > .modal-form-group:nth-child(3) { flex: 2 1 200px; }
+        #ledgerTransferModal .modal-body > .modal-form-group:nth-child(5) { flex: 2 1 200px; }
+        #ledgerTransferModal .transfer-arrow { flex: 0 0 auto; padding: 0 0 10px !important; }
+        #ledgerTransferModal .transfer-arrow svg { transform: rotate(-90deg); }
+        #ledgerTransferModal #transferPreview { flex: 1 1 100%; }
+        @media (max-width: 700px) {
+            #ledgerTransferModal .modal-body,
+            #newTransactionModal .modal-body { flex-direction: column; align-items: stretch; }
+            #ledgerTransferModal .modal-form-group,
+            #newTransactionModal .modal-form-group { flex: 0 0 auto !important; }
+            #ledgerTransferModal .transfer-arrow svg { transform: none; }
+            #ledgerTransferModal #transferPreview { flex: 0 0 auto; }
+        }
+
+
+        /* Combo box (type or pick from previous entries) */
+        .combo { position: relative; display: flex; }
+        .combo input { flex: 1; min-width: 0; padding-right: 38px !important; }
+        .combo-toggle {
+            position: absolute; right: 1px; top: 1px; bottom: 1px; width: 34px;
+            display: flex; align-items: center; justify-content: center;
+            background: transparent; border: none; border-left: 1px solid var(--border-color);
+            border-radius: 0 5px 5px 0; color: var(--text-muted); cursor: pointer;
+            transition: background-color .15s, color .15s;
+        }
+        .combo-toggle:hover { background: #f1f5f9; color: var(--primary-dark); }
+        .combo-toggle svg { transition: transform .15s; }
+        .combo.open .combo-toggle svg { transform: rotate(180deg); }
+        .combo-list {
+            position: fixed; z-index: 3000; display: none;
+            max-height: 240px; overflow-y: auto; overscroll-behavior: contain;
+            background: #fff; border: 1px solid var(--border-color); border-radius: 8px;
+            box-shadow: 0 12px 28px -8px rgba(15,23,42,0.28); padding: 4px;
+        }
+        .combo-list.show { display: block; }
+        .combo-item {
+            padding: 8px 10px; font-size: 14px; color: var(--text-main);
+            border-radius: 5px; cursor: pointer; white-space: nowrap;
+            overflow: hidden; text-overflow: ellipsis;
+        }
+        .combo-item.active, .combo-item:hover { background: #e0ecff; color: var(--primary-dark); }
+        .combo-item mark { background: #fde68a; color: inherit; border-radius: 2px; padding: 0 1px; }
+        .combo-empty { padding: 10px; font-size: 13px; color: var(--text-muted); text-align: center; }
+
         .ledger-table-container {
             margin-top: 10px; border: 1px solid var(--border-color);
             border-radius: 6px; overflow: hidden;
@@ -1275,14 +1331,14 @@
 
 <!-- ============ LEDGER TRANSFER MODAL ============ -->
 <div class="modal-overlay" id="ledgerTransferModal">
-    <div class="modal-content" style="width: 500px;">
+    <div class="modal-content">
         <div class="modal-header"><h3>Ledger to Ledger Transfer</h3><button class="modal-close" id="closeLedgerTransferModal">&times;</button></div>
         <div class="modal-body">
             <div class="modal-form-group">
                 <label for="transferFromLedger">From Ledger (Debit)</label>
                 <select id="transferFromLedger"></select>
             </div>
-            <div style="display: flex; justify-content: center; align-items: center; padding: 4px 0;">
+            <div class="transfer-arrow" style="display: flex; justify-content: center; align-items: center; padding: 4px 0;">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
             </div>
             <div class="modal-form-group">
@@ -1627,7 +1683,12 @@
             <div class="modal-form-group"><label for="txnDate">Date</label><input type="date" id="txnDate"></div>
             <div class="modal-form-group">
                 <label for="txnParticular">Particular</label>
-                <input type="text" id="txnParticular" list="particularList" placeholder="Select or type..." autocomplete="off">
+                <div class="combo" id="txnParticularCombo">
+                    <input type="text" id="txnParticular" placeholder="Select or type..." autocomplete="off" role="combobox" aria-expanded="false" aria-controls="txnParticularList">
+                    <button type="button" class="combo-toggle" id="txnParticularToggle" tabindex="-1" aria-label="Show previous particulars">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                </div>
             </div>
             <div class="modal-form-group"><label for="txnType">Transaction Type</label>
                 <select id="txnType">
@@ -3787,6 +3848,120 @@ document.addEventListener('DOMContentLoaded', function() {
             datalist.appendChild(opt);
         });
     }
+
+    /* ============ PARTICULAR COMBO BOX (New Ledger Transaction) ============ */
+    (function initParticularCombo() {
+        const combo = document.getElementById('txnParticularCombo');
+        const input = document.getElementById('txnParticular');
+        const toggle = document.getElementById('txnParticularToggle');
+        if (!combo || !input || !toggle) return;
+
+        const list = document.createElement('div');
+        list.className = 'combo-list';
+        list.id = 'txnParticularList';
+        list.setAttribute('role', 'listbox');
+        document.body.appendChild(list);
+
+        let items = [], activeIdx = -1;
+
+        function getPreviousParticulars() {
+            const skipTypes = ['Opening', 'Reversal', 'Adjustment', 'Transfer'];
+            const seen = new Set(), out = [];
+            ledgerHistory.forEach(h => {          // newest first, so recent particulars lead
+                const c = (h.caption || '').trim();
+                if (!c || skipTypes.includes(h.type)) return;
+                const k = c.toLowerCase();
+                if (seen.has(k)) return;
+                seen.add(k); out.push(c);
+            });
+            return out;
+        }
+        function esc(t) { return t.replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
+
+        function position() {
+            const r = input.getBoundingClientRect();
+            const below = window.innerHeight - r.bottom, h = Math.min(240, list.scrollHeight || 240);
+            list.style.left = r.left + 'px';
+            list.style.width = r.width + 'px';
+            if (below < h + 12 && r.top > below) { list.style.top = 'auto'; list.style.bottom = (window.innerHeight - r.top + 4) + 'px'; }
+            else { list.style.bottom = 'auto'; list.style.top = (r.bottom + 4) + 'px'; }
+        }
+        function setActive(i) {
+            const els = list.querySelectorAll('.combo-item');
+            els.forEach(e => e.classList.remove('active'));
+            activeIdx = i;
+            if (els[i]) { els[i].classList.add('active'); els[i].scrollIntoView({ block: 'nearest' }); }
+        }
+        function render(filterText) {
+            const q = (filterText || '').trim().toLowerCase();
+            items = getPreviousParticulars().filter(c => !q || c.toLowerCase().includes(q));
+            if (!items.length) {
+                list.innerHTML = '<div class="combo-empty">' + (q ? 'No match - your text will be used as typed' : 'No previous particulars yet') + '</div>';
+            } else {
+                list.innerHTML = items.map((c, i) => {
+                    let label = esc(c);
+                    if (q) {
+                        const at = c.toLowerCase().indexOf(q);
+                        label = esc(c.slice(0, at)) + '<mark>' + esc(c.slice(at, at + q.length)) + '</mark>' + esc(c.slice(at + q.length));
+                    }
+                    return '<div class="combo-item" role="option" data-i="' + i + '" title="' + esc(c) + '">' + label + '</div>';
+                }).join('');
+            }
+            activeIdx = -1;
+        }
+        function open(filterText) {
+            render(filterText);
+            list.classList.add('show'); combo.classList.add('open');
+            input.setAttribute('aria-expanded', 'true');
+            position();
+        }
+        function close() {
+            list.classList.remove('show'); combo.classList.remove('open');
+            input.setAttribute('aria-expanded', 'false'); activeIdx = -1;
+        }
+        function choose(i) {
+            if (!items[i]) return;
+            input.value = items[i];
+            close();
+            const amt = document.getElementById('txnAmount');
+            if (amt) amt.focus(); else input.focus();
+        }
+
+        input.addEventListener('input', () => open(input.value));
+        input.addEventListener('click', () => { if (!list.classList.contains('show')) open(''); });
+        toggle.addEventListener('mousedown', e => e.preventDefault());
+        toggle.addEventListener('click', () => {
+            if (list.classList.contains('show')) close(); else { input.focus(); open(''); }
+        });
+        list.addEventListener('mousedown', e => e.preventDefault());
+        list.addEventListener('click', e => {
+            const el = e.target.closest('.combo-item');
+            if (el) choose(parseInt(el.dataset.i, 10));
+        });
+        input.addEventListener('keydown', e => {
+            const isOpen = list.classList.contains('show');
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (!isOpen) { open(''); setActive(0); return; }
+                if (items.length) setActive((activeIdx + 1) % items.length);
+            } else if (e.key === 'ArrowUp' && isOpen) {
+                e.preventDefault();
+                if (items.length) setActive((activeIdx - 1 + items.length) % items.length);
+            } else if (e.key === 'Enter' && isOpen && activeIdx >= 0) {
+                e.preventDefault(); choose(activeIdx);
+            } else if (e.key === 'Escape' && isOpen) {
+                e.stopPropagation(); close();
+            } else if (e.key === 'Tab') { close(); }
+        });
+        input.addEventListener('blur', close);
+        window.addEventListener('resize', () => { if (list.classList.contains('show')) position(); });
+        document.addEventListener('scroll', e => {
+            if (list.classList.contains('show') && !list.contains(e.target)) close();
+        }, true);
+        // Close when the popup itself is dismissed
+        new MutationObserver(() => { if (!newTransactionModal.classList.contains('active')) close(); })
+            .observe(newTransactionModal, { attributes: true, attributeFilter: ['class'] });
+    })();
 
     /* Recalculate every history row's running balance from the entries themselves.
        The saved balance_after is only a snapshot from when the row was created, so it goes
